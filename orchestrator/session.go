@@ -78,6 +78,7 @@ func NewSession(storage model.PhononCard) (s *Session, err error) {
 	}
 	// launch session request handler
 	go s.handleIncommingSessionRequests()
+	globalTerminal.sessions = append(globalTerminal.sessions, s)
 	return s, nil
 }
 
