@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"html/template"
 	"io/ioutil"
+	"math/big"
 	"net/http"
+	"reflect"
 	"strconv"
 	"time"
 
@@ -44,8 +46,11 @@ type sessionCache struct {
 var cache map[string]*sessionCache
 
 func Server(port string, certFile string, keyFile string, mock bool) {
+	log.SetLevel(log.DebugLevel)
+	log.SetFormatter(&log.JSONFormatter{})
 	log.Debug("Starting local api server")
 	session := apiSession{orchestrator.NewPhononTerminal()}
+
 	//initialize cache map
 	cache = make(map[string]*sessionCache)
 	if mock {
@@ -95,7 +100,8 @@ func Server(port string, certFile string, keyFile string, mock bool) {
 	r.HandleFunc("/cards/{sessionID}/phonon/{PhononIndex}/setDescriptor", session.setDescriptor)
 	r.HandleFunc("/cards/{sessionID}/phonon/{PhononIndex}/send", session.send)
 	r.HandleFunc("/cards/{sessionID}/phonon/create", session.createPhonon)
-	r.HandleFunc("/cards/{sessionID}/phonon/{PhononIndex}/redeem", session.redeemPhonon)
+	r.HandleFunc("/cards/{sessionID}/phonon/redeem", session.redeemPhonons)
+	r.HandleFunc("/cards/{sessionID}/phonon/{PhononIndex}/export", session.exportPhonon)
 	r.HandleFunc("/cards/{sessionID}/phonon/initDeposit", session.initDepositPhonons)
 	r.HandleFunc("/cards/{sessionID}/phonon/finalizeDeposit", session.finalizeDepositPhonons)
 	r.HandleFunc("/cards/{sessionID}/connect", session.ConnectRemote)
@@ -103,6 +109,9 @@ func Server(port string, certFile string, keyFile string, mock bool) {
 	// api docs
 	r.PathPrefix("/swagger/").Handler(http.StripPrefix("/", http.FileServer(http.FS(swagger))))
 	r.HandleFunc("/swagger.json", serveAPIFunc(port))
+
+	// log sink
+	r.HandleFunc("/logs", logsink)
 
 	http.Handle("/", r)
 	log.Debug("Listening for incoming connections on " + port)
@@ -121,6 +130,71 @@ func Server(port string, certFile string, keyFile string, mock bool) {
 		}
 	}()
 	systray.Run(onReady, onExit)
+}
+
+func logsink(w http.ResponseWriter, r *http.Request) {
+	var msg map[string]interface{}
+	err := json.NewDecoder(r.Body).Decode(&msg)
+	if err != nil {
+		log.Errorf("Unable to decode logs from frontend: %s", err.Error)
+		http.Error(w, "unable to decode logs", http.StatusBadRequest)
+		return
+	}
+	lvl, ok := msg["level"]
+	if !ok {
+		log.WithFields(log.Fields(msg)).Debug()
+		return
+	} else {
+		lvlInt, err := parseJSLogLevel(lvl)
+		if err != nil {
+			log.Debug(fmt.Sprintf("Unable to decode log level from frontend: %s. Defaulting to debug", err.Error()))
+			log.WithFields(log.Fields(msg)).Debug()
+		} else {
+			switch lvlInt {
+			case jsLevelDebug:
+				log.WithFields(log.Fields(msg)).Debug()
+			case jsLevelInfo:
+				log.WithFields(log.Fields(msg)).Info()
+			case jsLevelWarn:
+				log.WithFields(log.Fields(msg)).Warn()
+			case jsLevelError:
+				log.WithFields(log.Fields(msg)).Error()
+			// no critical with logrus, so using error
+			case jsLevelCritical:
+				log.WithFields(log.Fields(msg)).Error()
+			default:
+				log.Debug("unable to decode log level from frontend. Defaulting to debug")
+				log.WithFields(log.Fields(msg)).Debug()
+			}
+		}
+	}
+}
+
+const (
+	jsLevelDebug    = 20
+	jsLevelInfo     = 30
+	jsLevelWarn     = 40
+	jsLevelError    = 50
+	jsLevelCritical = 60
+)
+
+func parseJSLogLevel(input interface{}) (int, error) {
+	var levelMap map[string]interface{}
+	if reflect.TypeOf(input) != reflect.TypeOf(map[string]interface{}{}) {
+		return 0, fmt.Errorf("Unable to parse level data from map")
+	} else {
+		levelMap = input.(map[string]interface{})
+	}
+	lvlraw, ok := levelMap["value"]
+	if !ok {
+		return 0, fmt.Errorf("Unable to find value key within level object")
+	}
+	lvlFloat64, ok := lvlraw.(float64)
+	if !ok {
+		return 0, fmt.Errorf("Unable to parse level value: %v into number", lvlraw)
+	}
+	lvlInt := int(lvlFloat64)
+	return lvlInt, nil
 }
 
 func onReady() {
@@ -175,25 +249,16 @@ func (apiSession *apiSession) initDepositPhonons(w http.ResponseWriter, r *http.
 	}
 	var depositPhononReq struct {
 		CurrencyType  model.CurrencyType
-		Denominations []int
+		Denominations []*model.Denomination
 	}
 	err = json.NewDecoder(r.Body).Decode(&depositPhononReq)
 	if err != nil {
 		log.Error("unable to decode initDeposit request")
 		return
 	}
-	var denoms []model.Denomination
-	for _, i := range depositPhononReq.Denominations {
-		d, err := model.NewDenomination(i)
-		if err != nil {
-			log.Error("error converting integer denomination request to denomination. err: ", err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
-		}
-		denoms = append(denoms, d)
-	}
 	log.Debug("depositPhononReq: ", depositPhononReq)
-	log.Debug("denoms: ", denoms)
-	phonons, err := sess.InitDepositPhonons(depositPhononReq.CurrencyType, denoms)
+	log.Debug("denoms: ", depositPhononReq.Denominations)
+	phonons, err := sess.InitDepositPhonons(depositPhononReq.CurrencyType, depositPhononReq.Denominations)
 	if err != nil {
 		log.Error("unable to create phonons for deposit. err: ", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -233,11 +298,6 @@ func (apiSession apiSession) finalizeDepositPhonons(w http.ResponseWriter, r *ht
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	for _, r := range ret {
-		cache[sess.GetName()].phonons[r.Phonon.KeyIndex] = r.Phonon
-	}
-
 	enc := json.NewEncoder(w)
 	err = enc.Encode(ret)
 	if err != nil {
@@ -245,6 +305,65 @@ func (apiSession apiSession) finalizeDepositPhonons(w http.ResponseWriter, r *ht
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+func (apiSession apiSession) redeemPhonons(w http.ResponseWriter, r *http.Request) {
+	sess, err := apiSession.sessionFromMuxVars(mux.Vars(r))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	type redeemPhononRequest struct {
+		P             *model.Phonon
+		RedeemAddress string
+	}
+	var reqs []*redeemPhononRequest
+	err = json.NewDecoder(r.Body).Decode(&reqs)
+	if err != nil {
+		log.Error("unable to decode redeemPhonons json. err: ", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if len(reqs) == 0 {
+		log.Error("request data empty")
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	for _, req := range reqs {
+		log.Debugf("received redeem phonon %+v", req.P)
+		log.Debug("received redeem address: ", req.RedeemAddress)
+	}
+	//TODO: Validate data contains what it needs to
+	type redeemPhononResp struct {
+		TransactionData string
+		PrivKey         string
+		err             string
+	}
+	var resps []*redeemPhononResp
+	for _, req := range reqs {
+		var respErr string
+		transactionData, privKeyString, err := sess.RedeemPhonon(req.P, req.RedeemAddress)
+		//If err capture the error message as a string, else return string value ""
+		if err != nil {
+			respErr = err.Error()
+		}
+		resps = append(resps, &redeemPhononResp{
+			TransactionData: transactionData,
+			PrivKey:         privKeyString,
+			err:             respErr,
+		})
+	}
+
+	enc := json.NewEncoder(w)
+	err = enc.Encode(resps)
+	if err != nil {
+		log.Error("unable to encode outgoing redeem response")
+		return
+	}
+}
+
+func serveapi(w http.ResponseWriter, r *http.Request) {
+	http.ServeContent(w, r, "swagger.json", time.Time{}, bytes.NewReader(swaggeryaml))
 }
 
 func serveAPIFunc(port string) func(w http.ResponseWriter, r *http.Request) {
@@ -454,7 +573,7 @@ func (apiSession apiSession) setDescriptor(w http.ResponseWriter, r *http.Reques
 	}{}
 	json.Unmarshal(b, &inputs)
 
-	den, err := model.NewDenomination(inputs.Value)
+	den, err := model.NewDenomination(big.NewInt(int64(inputs.Value)))
 	if err != nil {
 		http.Error(w, "Unable to convert value to base and exponent form for phonon storage: "+err.Error(), http.StatusBadRequest)
 	}
@@ -500,7 +619,7 @@ func (apiSession apiSession) send(w http.ResponseWriter, r *http.Request) {
 	delete(cache[sess.GetName()].phonons, uint16(index))
 }
 
-func (apiSession apiSession) redeemPhonon(w http.ResponseWriter, r *http.Request) {
+func (apiSession apiSession) exportPhonon(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	sess, err := apiSession.sessionFromMuxVars(vars)
 	if err != nil {
@@ -550,7 +669,7 @@ func (apiSession apiSession) sessionFromMuxVars(p map[string]string) (*orchestra
 	sessionName, ok := p["sessionID"]
 	if !ok {
 		fmt.Println("unable to find session")
-		return nil, fmt.Errorf("unable to find sesion")
+		return nil, fmt.Errorf("unable to find session")
 	}
 	sessions := apiSession.t.ListSessions()
 	var targetSession *orchestrator.Session
@@ -561,7 +680,7 @@ func (apiSession apiSession) sessionFromMuxVars(p map[string]string) (*orchestra
 		}
 	}
 	if targetSession == nil {
-		return nil, fmt.Errorf("unable to find sesion")
+		return nil, fmt.Errorf("unable to find session")
 	}
 	return targetSession, nil
 }
