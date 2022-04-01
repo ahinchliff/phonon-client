@@ -81,3 +81,21 @@ func (t *PhononTerminal) SessionFromID(id string) *Session {
 	}
 	return nil
 }
+
+func (t *PhononTerminal) AddSession(sess *Session) {
+	for _, session := range t.sessions {
+		if session.GetName() == sess.GetName() {
+			return
+		}
+	}
+	t.sessions = append(t.sessions, sess)
+}
+
+func (t *PhononTerminal) RemoveSession(sessID string){
+	for index, session := range t.sessions {
+		if session.GetName() == sessID{
+			t.sessions = append(t.sessions[:index], t.sessions[index+1:]...)
+			return
+		}
+	}
+}
