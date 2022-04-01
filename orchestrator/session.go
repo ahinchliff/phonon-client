@@ -84,7 +84,6 @@ func NewSession(storage model.PhononCard) (s *Session, err error) {
 	}
 	// launch session request handler
 	go s.handleIncomingSessionRequests()
-	globalTerminal.sessions = append(globalTerminal.sessions, s)
 	log.Debug("initialized new applet session")
 	return s, nil
 }

@@ -58,10 +58,11 @@ func (t *PhononTerminal) RefreshSessions() ([]*Session, error) {
 		return nil, err
 	}
 	for _, reader := range readers {
-		_, err := NewSession(card.NewPhononCommandSet(io.NewNormalChannel(reader)))
+		s, err := NewSession(card.NewPhononCommandSet(io.NewNormalChannel(reader)))
 		if err != nil {
 			return nil, err
 		}
+		t.sessions = append(t.sessions, s)
 	}
 	if len(t.sessions) == 0 {
 		return nil, errors.New("no cards detected")
@@ -91,9 +92,9 @@ func (t *PhononTerminal) AddSession(sess *Session) {
 	t.sessions = append(t.sessions, sess)
 }
 
-func (t *PhononTerminal) RemoveSession(sessID string){
+func (t *PhononTerminal) RemoveSession(sessID string) {
 	for index, session := range t.sessions {
-		if session.GetName() == sessID{
+		if session.GetName() == sessID {
 			t.sessions = append(t.sessions[:index], t.sessions[index+1:]...)
 			return
 		}
