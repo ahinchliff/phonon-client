@@ -214,7 +214,7 @@ func NewCommandSetDescriptor(data []byte) *Command {
 		PossibleErrs: CmdErrTable{
 			SW_CONDITIONS_NOT_SATISFIED: ErrPINNotEntered,
 			SW_WRONG_LENGTH:             errors.New("wrong data length"),
-			SW_FILE_INVALID:             errors.New("phonon index 0 invalid"),
+			SW_FILE_INVALID:             errors.New("phonon index invalid"),
 			SW_FILE_INVALID + 1:         errors.New("phonon does not exist"),
 			SW_FILE_INVALID + 3:         errors.New("phonon does not exist"),
 			SW_FILE_INVALID + 4:         errors.New("unable to decode Currency TLV"),
@@ -260,7 +260,7 @@ func NewCommandGetPhononPubKey(data []byte) *Command {
 			SW_CONDITIONS_NOT_SATISFIED: ErrPINNotEntered,
 			SW_WRONG_LENGTH:             errors.New("Data length incorrect"),
 			SW_WRONG_DATA:               errors.New("Phonon index invalid"),
-			SW_FILE_INVALID:             errors.New("Phonon index 0 invalid"),
+			SW_FILE_INVALID:             errors.New("Phonon index invalid"),
 			SW_FILE_INVALID + 1:         errors.New("Phonon at index exceeds available phonon list"),
 			SW_FILE_INVALID + 3:         errors.New("phonon at index is null"),
 			SW_FILE_NOT_FOUND:           errors.New("Phonon not initialized"),
@@ -281,7 +281,7 @@ func NewCommandDestroyPhonon(data []byte) *Command {
 			SW_CONDITIONS_NOT_SATISFIED: ErrPINNotEntered,
 			SW_WRONG_LENGTH:             errors.New("Incoming length wrong"),
 			SW_WRONG_DATA:               errors.New("Invalid phonon index"),
-			SW_FILE_INVALID:             errors.New("Phonon index 0 invalid"),
+			SW_FILE_INVALID:             errors.New("Phonon index invalid"),
 			SW_FILE_INVALID + 1:         errors.New("Phononon doesn't exist"),
 			// adding 2 doesn't work because it conflicts with another error
 			SW_FILE_INVALID + 3: errors.New("Phonon already deleted"),
