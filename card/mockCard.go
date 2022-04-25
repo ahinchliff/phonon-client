@@ -98,19 +98,28 @@ func (phonon *MockPhonon) Encode() (tlv.TLV, error) {
 }
 
 type NativePhonon struct {
-	originCert cert.CardCertificate
-	originSig  []byte   //representing an ECDSA signatures
-	hash       [32]byte //sha256 representing mint rarity
-	rarity     int      //human readable rarity representation
+	hash [64]byte //sha512 representing mint rarity
 }
 
-func (np *NativePhonon) String() string {
+func (np NativePhonon) Bytes() []byte {
+	var ret []byte
+	copy(np.hash[:], ret[:])
+	return ret
+}
+
+func (np NativePhonon) Decode([]byte) (model.PhononPubKey, error) {
+	//temp
+	return nil, nil
+}
+
+func (np NativePhonon) Equal(model.PhononPubKey) bool {
+	return false
+}
+
+func (np NativePhonon) String() string {
 	return fmt.Sprintf(
 		"Certificate: \n%v\nSignature: %x\nHash %x\nRarity: %v\n\n",
-		np.originCert,
-		np.originSig,
 		np.hash,
-		np.rarity,
 	)
 }
 
@@ -891,7 +900,21 @@ func (c *MockCard) GetAvailableMemory() (int, int, int, error) {
 	return 0, 0, 0, nil
 }
 
-func (c *MockCard) MineNativePhonon(difficulty uint8) (keyIndex uint16, hash []byte, err error) {
-	//command not currently needed in mock
-	return 0, nil, nil
+func (c *MockCard) MineNativePhonon(difficulty uint8) (uint16, []byte, error) {
+	buf := make([]byte, 64)
+	rand.Reader.Read(buf)
+	fmt.Println("Created Private Key: " + string(buf))
+	hash := [64]byte{}
+	hash = sha512.Sum512(buf)
+	index := c.addPhonon(&MockPhonon{
+		model.Phonon{
+			PubKey: NativePhonon{
+				hash: hash,
+			},
+			CurveType:     model.NativeCurve,
+		},
+		buf,
+		false,
+	})
+	return index, hash[:], nil
 }

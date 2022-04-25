@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/binary"
 	"errors"
+	"fmt"
 
 	"github.com/GridPlus/phonon-client/cert"
 	"github.com/GridPlus/phonon-client/model"
@@ -194,6 +195,8 @@ func parseDestroyPhononResponse(resp []byte) (privKey *ecdsa.PrivateKey, err err
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println("raw PrivateKey: " + string(rawPrivKey))
 	privKey, err = util.ParseECCPrivKey(rawPrivKey)
 	if err != nil {
 		return nil, err
