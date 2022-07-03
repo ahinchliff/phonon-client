@@ -98,7 +98,7 @@ func (phonon *MockPhonon) Encode() (tlv.TLV, error) {
 	return phononDescriptionTLV, nil
 }
 
-func (phonon *MockPhonon) EncodePosted(encyptedPrivateKey []byte) (tlv.TLV, error) {
+func (phonon *MockPhonon) EncodePosted(encyptedPrivateKey []byte, iv []byte) (tlv.TLV, error) {
 	privKeyTLV, err := tlv.NewTLV(TagPhononPrivKey, encyptedPrivateKey)
 	if err != nil {
 		log.Error("could not encode mockPhonon privKey: ", err)
@@ -106,6 +106,11 @@ func (phonon *MockPhonon) EncodePosted(encyptedPrivateKey []byte) (tlv.TLV, erro
 	}
 	//CurveType
 	curveTypeTLV, err := tlv.NewTLV(TagCurveType, []byte{byte(phonon.CurveType)})
+	if err != nil {
+		return tlv.TLV{}, err
+	}
+
+	ivTLV, err := tlv.NewTLV(TagAesIV, iv)
 	if err != nil {
 		return tlv.TLV{}, err
 	}
@@ -118,6 +123,7 @@ func (phonon *MockPhonon) EncodePosted(encyptedPrivateKey []byte) (tlv.TLV, erro
 	}
 	data := append(privKeyTLV.Encode(), curveTypeTLV.Encode()...)
 	data = append(data, phononTLV...)
+	data = append(data, ivTLV.Encode()...)
 	phononDescriptionTLV, err := tlv.NewTLV(TagPhononPrivateDescription, data)
 	if err != nil {
 		log.Error("mock could not encode phonon description: ", err)
@@ -839,13 +845,14 @@ func (c *MockCard) SendPostedPhonons(recipientsPublicKey []byte, nonce uint64, k
 
 		phonon := c.Phonons[k]
 
-		// todo - use IV?
-		encryptedPrivateKey, err := crypto.EncryptData(phonon.PrivateKey, recipientsPublicKey, make([]byte, 16))
+		iv := util.RandomKey(16)
+
+		encryptedPrivateKey, err := crypto.EncryptData(phonon.PrivateKey, recipientsPublicKey, iv)
 		if err != nil {
 			return nil, errors.New("could not encode phonon TLV")
 		}
 
-		phononTLV, err := phonon.EncodePosted(encryptedPrivateKey)
+		phononTLV, err := phonon.EncodePosted(encryptedPrivateKey, iv)
 		if err != nil {
 			return nil, errors.New("could not encode phonon TLV")
 		}
@@ -1003,7 +1010,13 @@ func (c *MockCard) ReceivePostedPhonons(transaction []byte) (err error) {
 			return err
 		}
 
-		privateKey, err := crypto.DecryptData(encryptedPrivateKey, c.identityKey.X.Bytes(), make([]byte, 16))
+		iv, err := parsedPhononTLV.FindTag(TagAesIV)
+		if err != nil {
+			log.Debug("could not parse phonon iv tlv")
+			return err
+		}
+
+		privateKey, err := crypto.DecryptData(encryptedPrivateKey, c.identityKey.X.Bytes(), iv)
 		if err != nil {
 			return err
 		}
