@@ -829,14 +829,7 @@ func (c *MockCard) SendPostedPhonons(recipientsPublicKey []byte, nonce uint64, k
 		return nil, errors.New("could not encode cert TLV")
 	}
 
-	// recipientsPublicKeyTLV, err := tlv.NewTLV(TagIdentityPublicKey, recipientsPublicKey)
-	// if err != nil {
-	// 	return nil, errors.New("could not encode recipientsPublicKey TVL")
-	// }
-
-	// sigData := append(nonceTLV.Encode(), phononsTLV.Encode()...)
-	// sigData = append(sigData, recipientsPublicKeyTLV.Encode()...)
-	sig, err := ecdsa.SignASN1(rand.Reader, c.identityKey, []byte("THIS_IS_A_TEST"))
+	sig, err := ecdsa.SignASN1(rand.Reader, c.identityKey, CreatePostedPhononSignatureData(recipientsPublicKey, nonceBytes, outgoingPhonons))
 
 	if err != nil {
 		return nil, err
@@ -902,13 +895,13 @@ func (c *MockCard) ReceivePostedPhonons(transaction []byte) (err error) {
 		return err
 	}
 
-	nonceTLV, err := collection.FindTag(TagNonce)
+	nonceBytes, err := collection.FindTag(TagNonce)
 
 	if err != nil {
 		return err
 	}
 
-	nonce := binary.BigEndian.Uint64(nonceTLV)
+	nonce := binary.BigEndian.Uint64(nonceBytes)
 
 	if nonce <= c.postedPhononNonce {
 		return errors.New("transaction.nonce is less than or equal to card.postedPhononNonce")
@@ -939,37 +932,42 @@ func (c *MockCard) ReceivePostedPhonons(transaction []byte) (err error) {
 		return errors.New("counterparty public key is not valid ECC point")
 	}
 
-	phononTLVs, err := collection.FindTags(TagPhononPrivateDescription)
+	phononsBytes, err := collection.FindTags(TagPhononPrivateDescription)
 	if err != nil {
 		return err
-	}
-
-	sigTVL, err := collection.FindTag(TagECDSASig)
-	if err != nil {
-		return err
-	}
-
-	// todo - work out correct way to pass in recipients public key
-	// recipientsPublicKeyTLV, err := tlv.NewTLV(TagIdentityPublicKey, c.IdentityPubKey.X.Bytes())
-	// todo - should pass in all phonons
-	// sigData := append(nonceTLV, phononTLVs[0]...)
-	// sigData = append(sigData, recipientsPublicKeyTLV.Encode()...)
-
-	// Validate sig
-	sigValid := ecdsa.VerifyASN1(senderPubKey, []byte("THIS_IS_A_TEST"), sigTVL)
-	if !sigValid {
-		return errors.New("signature invalid")
 	}
 
 	//Parse all received phonons
 	var phonons []MockPhonon
-	for _, tlv := range phononTLVs {
-		phonon, err := decodePhononTLV(tlv)
+	for _, bytes := range phononsBytes {
+		phonon, err := decodePhononTLV(bytes)
 		if err != nil {
 			return err
 		}
 		phonons = append(phonons, phonon)
 	}
+
+	sig, err := collection.FindTag(TagECDSASig)
+	if err != nil {
+		return err
+	}
+
+	var phononData []byte
+	for _, phononByte := range phononsBytes {
+
+		phononTVL, err := tlv.NewTLV(TagPhononPrivateDescription, phononByte)
+		if err != nil {
+			return err
+		}
+		phononData = append(phononData, phononTVL.Encode()...)
+	}
+
+	// Validate sig
+	isSigValid := ecdsa.VerifyASN1(senderPubKey, CreatePostedPhononSignatureData(c.IdentityPubKey.X.Bytes(), nonceBytes, phononData), sig)
+	if !isSigValid {
+		return errors.New("signature invalid")
+	}
+
 	//Store all received phonons
 	for _, p := range phonons {
 		c.addPhonon(&p)
@@ -1091,4 +1089,9 @@ This is the process for deriving a native phonon hash, which is stored as its pu
 func DeriveNativePhononPubKey(salt []byte) *model.NativePubKey {
 	hash := sha512.Sum512(salt)
 	return &model.NativePubKey{Hash: hash[:]}
+}
+
+func CreatePostedPhononSignatureData(recipientsPublicKey []byte, nonce []byte, phonons []byte) []byte {
+	sig := append(recipientsPublicKey, nonce...)
+	return append(sig, phonons...)
 }
