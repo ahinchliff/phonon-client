@@ -1004,8 +1004,12 @@ func (c *MockCard) ReceivePostedPhonons(transaction []byte) (err error) {
 		}
 
 		privateKey, err := crypto.DecryptData(encryptedPrivateKey, c.identityKey.X.Bytes(), make([]byte, 16))
+		if err != nil {
+			return err
+		}
 
 		phonon, err := decodePostedPhononTLV(phononTLV, privateKey)
+
 		if err != nil {
 			return err
 		}
