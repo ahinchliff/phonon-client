@@ -28,22 +28,22 @@ type MockCard struct {
 	Phonons []*MockPhonon
 
 	// This is a slice of indeces of deleted phonons. This is to match the insert logic of the card implementation
-	deletedPhonons    []int
-	pin               string
-	pinVerified       bool
-	sc                SecureChannel
-	receiveList       []*ecdsa.PublicKey
-	identityKey       *ecdsa.PrivateKey
-	IdentityPubKey    *ecdsa.PublicKey
-	IdentityCert      cert.CardCertificate
-	scPairData        SecureChannelPairingDetails
-	invoices          map[string][]byte
-	outgoingInvoice   Invoice
-	staticPairing     bool
-	friendlyName      string
-	mintLimit         int
-	mintRate          int
-	postedPhononNonce uint64
+	deletedPhonons  []int
+	pin             string
+	pinVerified     bool
+	sc              SecureChannel
+	receiveList     []*ecdsa.PublicKey
+	identityKey     *ecdsa.PrivateKey
+	IdentityPubKey  *ecdsa.PublicKey
+	IdentityCert    cert.CardCertificate
+	scPairData      SecureChannelPairingDetails
+	invoices        map[string][]byte
+	outgoingInvoice Invoice
+	staticPairing   bool
+	friendlyName    string
+	mintLimit       int
+	mintRate        int
+	nonce           uint64
 }
 
 type MockPhonon struct {
@@ -903,7 +903,8 @@ func (c *MockCard) ReceivePostedPhonons(transaction []byte) (err error) {
 
 	nonce := binary.BigEndian.Uint64(nonceBytes)
 
-	if nonce <= c.postedPhononNonce {
+	// check that nonce is valid
+	if nonce <= c.nonce {
 		return errors.New("transaction.nonce is less than or equal to card.postedPhononNonce")
 	}
 
@@ -917,16 +918,18 @@ func (c *MockCard) ReceivePostedPhonons(transaction []byte) (err error) {
 		return err
 	}
 
-	senderPubKey, err := util.ParseECCPubKey(senderCardCert.PubKey)
-	if err != nil {
-		return err
-	}
-
+	// check that sender's cert is valid
 	err = cert.ValidateCardCertificate(senderCardCert, gridplus.SafecardDevCAPubKey)
 	if err != nil {
 		return err
 	}
 
+	senderPubKey, err := util.ParseECCPubKey(senderCardCert.PubKey)
+	if err != nil {
+		return err
+	}
+
+	// check that sender's public key is valid
 	pubKeyValid := gridplus.ValidateECCPubKey(senderPubKey)
 	if !pubKeyValid {
 		return errors.New("counterparty public key is not valid ECC point")
@@ -937,7 +940,7 @@ func (c *MockCard) ReceivePostedPhonons(transaction []byte) (err error) {
 		return err
 	}
 
-	//Parse all received phonons
+	// parse all received phonons
 	var phonons []MockPhonon
 	for _, bytes := range phononsBytes {
 		phonon, err := decodePhononTLV(bytes)
@@ -954,7 +957,6 @@ func (c *MockCard) ReceivePostedPhonons(transaction []byte) (err error) {
 
 	var phononData []byte
 	for _, phononByte := range phononsBytes {
-
 		phononTVL, err := tlv.NewTLV(TagPhononPrivateDescription, phononByte)
 		if err != nil {
 			return err
@@ -968,12 +970,13 @@ func (c *MockCard) ReceivePostedPhonons(transaction []byte) (err error) {
 		return errors.New("signature invalid")
 	}
 
-	//Store all received phonons
+	// store all received phonons
 	for _, p := range phonons {
 		c.addPhonon(&p)
 	}
 
-	c.postedPhononNonce = nonce
+	// update nonce
+	c.nonce = nonce
 
 	return nil
 }
