@@ -164,6 +164,43 @@ func decodePhononTLV(privatePhononTLV []byte) (phonon MockPhonon, err error) {
 	return phonon, nil
 }
 
+func decodePostedPhononTLV(privatePhononTLV []byte, phononPrivateKey []byte) (phonon MockPhonon, err error) {
+	phononTLV, err := tlv.ParseTLVPacket(privatePhononTLV, TagPhononPrivateDescription)
+	if err != nil {
+		return phonon, err
+	}
+
+	//Parse private key for later
+	phonon.PrivateKey = phononPrivateKey
+	if err != nil {
+		log.Debug("could not parse phonon private key tlv")
+		return phonon, err
+	}
+	//Parse standard public fields and extended schema
+	publicPhonon, err := TLVDecodePublicPhononFields(phononTLV)
+	if err != nil {
+		return phonon, err
+	}
+
+	phonon.Phonon = *publicPhonon
+
+	switch phonon.CurveType {
+	case model.Secp256k1:
+		eccPrivKey, err := util.ParseECCPrivKey(phonon.PrivateKey)
+		if err != nil {
+			return phonon, err
+		}
+		phonon.PubKey, err = model.NewPhononPubKey(ethcrypto.FromECDSAPub(&eccPrivKey.PublicKey), model.Secp256k1)
+		if err != nil {
+			return phonon, err
+		}
+	case model.NativeCurve:
+		phonon.PubKey = DeriveNativePhononPubKey(phonon.PrivateKey)
+	}
+
+	return phonon, nil
+}
+
 type SecureChannelPairingDetails struct {
 	cardToCardSalt     []byte
 	counterpartyPubKey *ecdsa.PublicKey
@@ -802,8 +839,13 @@ func (c *MockCard) SendPostedPhonons(recipientsPublicKey []byte, nonce uint64, k
 
 		phonon := c.Phonons[k]
 
-		// todo - encrypt private key with recipient's public key
-		phononTLV, err := phonon.EncodePosted(phonon.PrivateKey)
+		// todo - use IV?
+		encryptedPrivateKey, err := crypto.EncryptData(phonon.PrivateKey, recipientsPublicKey, make([]byte, 16))
+		if err != nil {
+			return nil, errors.New("could not encode phonon TLV")
+		}
+
+		phononTLV, err := phonon.EncodePosted(encryptedPrivateKey)
 		if err != nil {
 			return nil, errors.New("could not encode phonon TLV")
 		}
@@ -949,7 +991,21 @@ func (c *MockCard) ReceivePostedPhonons(transaction []byte) (err error) {
 	// parse all received phonons
 	var phonons []MockPhonon
 	for _, phononTLV := range phononTLVs {
-		phonon, err := decodePhononTLV(phononTLV)
+
+		parsedPhononTLV, err := tlv.ParseTLVPacket(phononTLV, TagPhononPrivateDescription)
+		if err != nil {
+			return err
+		}
+
+		encryptedPrivateKey, err := parsedPhononTLV.FindTag(TagPhononPrivKey)
+		if err != nil {
+			log.Debug("could not parse phonon private key tlv")
+			return err
+		}
+
+		privateKey, err := crypto.DecryptData(encryptedPrivateKey, c.identityKey.X.Bytes(), make([]byte, 16))
+
+		phonon, err := decodePostedPhononTLV(phononTLV, privateKey)
 		if err != nil {
 			return err
 		}
@@ -962,7 +1018,7 @@ func (c *MockCard) ReceivePostedPhonons(transaction []byte) (err error) {
 	}
 
 	// here I am converting the data into the format required for the signature verification
-	// there is probably an easy way of doing it but I can't work it out.
+	// there is probably an better way of doing this but I can't work it out.
 	var phononData []byte
 	for _, phononTLV := range phononTLVs {
 		phononTVL, err := tlv.NewTLV(TagPhononPrivateDescription, phononTLV)
