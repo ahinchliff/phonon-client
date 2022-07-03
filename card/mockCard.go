@@ -811,7 +811,8 @@ func (c *MockCard) SendPostedPhonons(recipientsPublicKey []byte, nonce uint64, k
 		outgoingPhonons = append(outgoingPhonons, phononTLV.Encode()...)
 	}
 
-	phononsTLV, err := tlv.NewTLV(TagPhononPrivateDescription, outgoingPhonons)
+	phononTransferTLV, err := tlv.NewTLV(TagTransferPhononPacket, outgoingPhonons)
+
 	if err != nil {
 		return nil, errors.New("could not encode phonon transfer TLV")
 	}
@@ -840,7 +841,7 @@ func (c *MockCard) SendPostedPhonons(recipientsPublicKey []byte, nonce uint64, k
 		return nil, errors.New("could not encode signedMessage TLV")
 	}
 
-	data := append(nonceTLV.Encode(), phononsTLV.Encode()...)
+	data := append(nonceTLV.Encode(), phononTransferTLV.Encode()...)
 	data = append(data, cardCertTLV.Encode()...)
 	data = append(data, sigTLV.Encode()...)
 
@@ -935,15 +936,20 @@ func (c *MockCard) ReceivePostedPhonons(transaction []byte) (err error) {
 		return errors.New("counterparty public key is not valid ECC point")
 	}
 
-	phononsBytes, err := collection.FindTags(TagPhononPrivateDescription)
+	phononTransferPacketTLV, err := tlv.ParseTLVPacket(transaction, TagTransferPhononPacket)
+	if err != nil {
+		return err
+	}
+
+	phononTLVs, err := phononTransferPacketTLV.FindTags(TagPhononPrivateDescription)
 	if err != nil {
 		return err
 	}
 
 	// parse all received phonons
 	var phonons []MockPhonon
-	for _, bytes := range phononsBytes {
-		phonon, err := decodePhononTLV(bytes)
+	for _, phononTLV := range phononTLVs {
+		phonon, err := decodePhononTLV(phononTLV)
 		if err != nil {
 			return err
 		}
@@ -955,9 +961,11 @@ func (c *MockCard) ReceivePostedPhonons(transaction []byte) (err error) {
 		return err
 	}
 
+	// here I am converting the data into the format required for the signature verification
+	// there is probably an easy way of doing it but I can't work it out.
 	var phononData []byte
-	for _, phononByte := range phononsBytes {
-		phononTVL, err := tlv.NewTLV(TagPhononPrivateDescription, phononByte)
+	for _, phononTLV := range phononTLVs {
+		phononTVL, err := tlv.NewTLV(TagPhononPrivateDescription, phononTLV)
 		if err != nil {
 			return err
 		}

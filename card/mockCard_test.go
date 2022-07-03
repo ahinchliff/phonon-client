@@ -39,7 +39,7 @@ func TestCardPair(t *testing.T) {
 	}
 }
 
-func TestCreatePostedPhonons(t *testing.T) {
+func TestPostedPhononFlow(t *testing.T) {
 	senderCard, err := NewMockCard(true, false)
 	if err != nil {
 		t.Error(err)
@@ -53,18 +53,10 @@ func TestCreatePostedPhonons(t *testing.T) {
 	senderCard.VerifyPIN("111111")
 	recipientCard.VerifyPIN("111111")
 
-	keyIndex, pubKey, err := senderCard.CreatePhonon(model.Secp256k1)
+	_, createdPhononPubKey, err := senderCard.CreatePhonon(model.Secp256k1)
 
 	if err != nil {
 		t.Error(err)
-	}
-
-	if keyIndex != 0 {
-		t.Error("keyIndex is not 0;", keyIndex)
-	}
-
-	if pubKey == nil {
-		t.Error("pubKey is nil", pubKey)
 	}
 
 	// todo - work out correct way to pass in recipients public key
@@ -78,6 +70,15 @@ func TestCreatePostedPhonons(t *testing.T) {
 
 	if err != nil {
 		t.Error(err)
+	}
+
+	receivedPhononPubKey, err := recipientCard.GetPhononPubKey(0, model.Secp256k1)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !createdPhononPubKey.Equal(receivedPhononPubKey) {
+		t.Error("Created and received phonon pub keys do not match", createdPhononPubKey, receivedPhononPubKey)
 	}
 
 }
