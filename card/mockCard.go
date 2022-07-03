@@ -829,14 +829,14 @@ func (c *MockCard) SendPostedPhonons(recipientsPublicKey []byte, nonce uint64, k
 		return nil, errors.New("could not encode cert TLV")
 	}
 
-	recipientsPublicKeyTLV, err := tlv.NewTLV(TagIdentityPublicKey, recipientsPublicKey)
-	if err != nil {
-		return nil, errors.New("could not encode recipientsPublicKey TVL")
-	}
+	// recipientsPublicKeyTLV, err := tlv.NewTLV(TagIdentityPublicKey, recipientsPublicKey)
+	// if err != nil {
+	// 	return nil, errors.New("could not encode recipientsPublicKey TVL")
+	// }
 
-	sigData := append(nonceTLV.Encode(), phononsTLV.Encode()...)
-	sigData = append(sigData, recipientsPublicKeyTLV.Encode()...)
-	sig, err := ecdsa.SignASN1(rand.Reader, c.identityKey, sigData)
+	// sigData := append(nonceTLV.Encode(), phononsTLV.Encode()...)
+	// sigData = append(sigData, recipientsPublicKeyTLV.Encode()...)
+	sig, err := ecdsa.SignASN1(rand.Reader, c.identityKey, []byte("THIS_IS_A_TEST"))
 
 	if err != nil {
 		return nil, err
@@ -950,12 +950,13 @@ func (c *MockCard) ReceivePostedPhonons(transaction []byte) (err error) {
 	}
 
 	// todo - work out correct way to pass in recipients public key
-	recipientsPublicKeyTLV, err := tlv.NewTLV(TagIdentityPublicKey, c.IdentityPubKey.X.Bytes())
-	sigData := append(nonceTLV, phononTLVs[0]...)
-	sigData = append(sigData, recipientsPublicKeyTLV.Encode()...)
+	// recipientsPublicKeyTLV, err := tlv.NewTLV(TagIdentityPublicKey, c.IdentityPubKey.X.Bytes())
+	// todo - should pass in all phonons
+	// sigData := append(nonceTLV, phononTLVs[0]...)
+	// sigData = append(sigData, recipientsPublicKeyTLV.Encode()...)
 
 	// Validate sig
-	sigValid := ecdsa.VerifyASN1(senderPubKey, sigData, sigTVL)
+	sigValid := ecdsa.VerifyASN1(senderPubKey, []byte("THIS_IS_A_TEST"), sigTVL)
 	if !sigValid {
 		return errors.New("signature invalid")
 	}
