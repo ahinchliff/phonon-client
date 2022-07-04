@@ -257,7 +257,7 @@ func (s *Session) DestroyPhonon(keyIndex uint16) (privKey *ecdsa.PrivateKey, err
 
 func (s *Session) IdentifyCard(nonce []byte) (cardPubKey *ecdsa.PublicKey, cardSig *util.ECDSASignature, err error) {
 	if !s.verified() {
-		return nil, card.ErrPINNotEntered
+		return nil, nil, card.ErrPINNotEntered
 	}
 	s.ElementUsageMtex.Lock()
 	defer s.ElementUsageMtex.Unlock()
@@ -271,7 +271,7 @@ func (s *Session) IdentifyPostedPhononNonce() (nonce uint64, err error) {
 	}
 	s.ElementUsageMtex.Lock()
 	defer s.ElementUsageMtex.Unlock()
-	
+
 	return s.cs.IdentifyPostedPhononNonce()
 }
 
