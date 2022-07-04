@@ -100,3 +100,17 @@ func identifyCard(c *ishell.Context) {
   c.Println(util.ECCPubKeyToHexString(cardPubKey))
   return
 }
+
+func identifyPostedPhononNonce(c *ishell.Context) {
+  if ready := checkActiveCard(c); !ready {
+    return
+  }
+
+  nonce, err  := activeCard.IdentifyPostedPhononNonce()
+  if err != nil {
+		c.Println("error getting posted phonon nonce: ", err)
+		return
+	}
+  c.Println("Current posted phonon nonce: ", nonce)
+  c.Println("Next avaialble posted phonon nonce: ", nonce+1)
+}

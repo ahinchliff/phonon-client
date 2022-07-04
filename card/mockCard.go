@@ -337,6 +337,10 @@ func (c *MockCard) IdentifyCard(nonce []byte) (cardPubKey *ecdsa.PublicKey, card
 	return c.IdentityPubKey, cardSig, nil
 }
 
+func (c *MockCard) IdentifyPostedPhononNonce() (nonce uint64, err error) {
+	return c.nonce, nil
+}
+
 func (c *MockCard) InstallCertificate(signKeyFunc func([]byte) ([]byte, error)) error {
 	var err error
 	rawCardCert, err := cert.CreateCardCertificate(c.IdentityPubKey, signKeyFunc)

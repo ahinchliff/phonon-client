@@ -415,6 +415,12 @@ func (cs *PhononCommandSet) IdentifyCard(nonce []byte) (cardPubKey *ecdsa.Public
 	return cardPubKey, cardSig, nil
 }
 
+func (cs *PhononCommandSet) IdentifyPostedPhononNonce() (nonce uint64, err error){
+	log.Debug("sending IDENTIFY_POSTED_PHONON_NONCE command")
+	log.Debug("POST PHONONS ONLY AVAIALABLE FOR MOCK CARDS RIGHT NOW")
+	return 0, nil
+}
+
 func (cs *PhononCommandSet) VerifyPIN(pin string) error {
 	log.Debug("sending VERIFY_PIN command")
 	cmd := NewCommandVerifyPIN(pin)

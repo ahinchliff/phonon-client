@@ -62,6 +62,11 @@ func Start() {
 		Help: "Get active card's public key as hex",
 	})
 	shell.AddCmd(&ishell.Cmd{
+		Name: "identifyPostedPhononNonce",
+		Func: identifyPostedPhononNonce,
+		Help: "Get the card's next posted phonon nonce",
+	})
+	shell.AddCmd(&ishell.Cmd{
 		Name: "changePin",
 		Func: changeCardPIN,
 		Help: "Change the active card's PIN",

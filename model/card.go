@@ -14,6 +14,7 @@ type PhononCard interface {
 	OpenSecureConnection() error
 	Init(pin string) error
 	IdentifyCard(nonce []byte) (cardPubKey *ecdsa.PublicKey, cardSig *util.ECDSASignature, err error)
+	IdentifyPostedPhononNonce() (nonce uint64, err error)
 	VerifyPIN(pin string) error
 	ChangePIN(pin string) error
 	CreatePhonon(curveType CurveType) (keyIndex uint16, pubKey PhononPubKey, err error)
