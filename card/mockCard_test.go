@@ -68,7 +68,7 @@ func TestCreatePostedPhonons(t *testing.T) {
 	}
 
 	// todo - work out correct way to pass in recipients public key
-	sendResult, err := senderCard.SendPostedPhonons(recipientCard.IdentityPubKey.X.Bytes(), 1, []uint16{0})
+	sendResult, err := senderCard.PostPhonons(recipientCard.IdentityPubKey.X.Bytes(), 1, []uint16{0})
 
 	if err != nil {
 		t.Error(err)

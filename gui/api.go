@@ -22,7 +22,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-//go:embed frontend/build/*
 var frontend embed.FS
 
 //go:embed swagger.yaml

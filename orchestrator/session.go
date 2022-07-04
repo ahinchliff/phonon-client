@@ -337,6 +337,26 @@ func (s *Session) SendPhonons(keyIndices []uint16) error {
 	return nil
 }
 
+func (s *Session) PostPhonons(pubkey []byte, nonce uint64, keyIndices []uint16) (transferPhononPackets []byte, err error) {
+	log.Debug("sending orchestrator POST_PHONONS for mock card")
+
+	transferPhononPackets, err = s.cs.PostPhonons(pubkey, nonce, keyIndices)
+	if err != nil {
+		return nil, err
+	}
+	return transferPhononPackets, nil
+}
+
+func (s *Session) ReceivePostedPhonons(postedPacket []byte) (err error) {
+	log.Debug("sending orchestrator RECEIVE_POSTED_PHONONS for mock card")
+
+	err = s.cs.ReceivePostedPhonons(postedPacket)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *Session) ReceivePhonons(phononTransferPacket []byte) error {
 	if !s.verified() && s.RemoteCard != nil {
 		return ErrCardNotPairedToCard
