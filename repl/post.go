@@ -18,6 +18,8 @@ func postPhonons(c *ishell.Context) {
   c.Println("What is receiving card's public key hex?")
   receivingPubKeyInput := c.ReadLine()
 	receivingCardPubKeybytes, err := hex.DecodeString(receivingPubKeyInput)
+  receivingCardPubKey, err := util.ParseECCPubKey(receivingCardPubKeybytes)
+  receivingCardPubKeyXbytes := receivingCardPubKey.X.Bytes()
   if err != nil {
     c.Println("could not decode public key hex: ", err)
     return
@@ -48,7 +50,7 @@ func postPhonons(c *ishell.Context) {
 		keyIndices = append(keyIndices, uint16(keyindex))
 	}
 
-  transferPhononPackets, err := activeCard.PostPhonons(receivingCardPubKeybytes, nonce, keyIndices)
+  transferPhononPackets, err := activeCard.PostPhonons(receivingCardPubKeyXbytes, nonce, keyIndices)
 	if err != nil {
 		c.Println("error during post phonons: ", err)
 		return
