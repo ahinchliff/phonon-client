@@ -104,7 +104,7 @@ func Start() {
 		Name: "receivePostedPhonons",
 		Func: receivePostedPhonons,
 		Help: `Receive posted phonons from inbox.
-		       Args: [Posted Bytes Packet]`,
+		       Args: [hex of posted phonon packet]`,
 	})
 	// shell.AddCmd(&ishell.Cmd{
 	// 	Name: "balance",
