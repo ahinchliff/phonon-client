@@ -262,6 +262,13 @@ func (s *Session) IdentifyCard(nonce []byte) (cardPubKey *ecdsa.PublicKey, cardS
 	return s.cs.IdentifyCard(nonce)
 }
 
+func (s *Session) IdentifyPostedPhononNonce() (nonce uint64, err error) {
+	if !s.verified() {
+		return 0, card.ErrPINNotEntered
+	}
+	return s.cs.IdentifyPostedPhononNonce()
+}
+
 func (s *Session) InitCardPairing(receiverCert cert.CardCertificate) ([]byte, error) {
 	if !s.verified() {
 		return nil, card.ErrPINNotEntered
