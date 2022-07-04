@@ -99,6 +99,7 @@ func (phonon *MockPhonon) Encode() (tlv.TLV, error) {
 }
 
 func (phonon *MockPhonon) EncodePosted(encyptedPrivateKey []byte, iv []byte) (tlv.TLV, error) {
+	log.Debug("sending mock ENCODE_POSTED command")
 	privKeyTLV, err := tlv.NewTLV(TagPhononPrivKey, encyptedPrivateKey)
 	if err != nil {
 		log.Error("could not encode mockPhonon privKey: ", err)
@@ -832,9 +833,10 @@ func (c *MockCard) SendPhonons(keyIndices []uint16, extendedRequest bool) (trans
 // 	return nil
 // }
 
-func (c *MockCard) SendPostedPhonons(recipientsPublicKey []byte, nonce uint64, keyIndices []uint16) (transferPhononPackets []byte, err error) {
-	log.Debug("mock SEND_POSTED_PHONONS command")
+func (c *MockCard) PostPhonons(recipientsPublicKey []byte, nonce uint64, keyIndices []uint16) (transferPhononPackets []byte, err error) {
+	log.Debug("sending mock POST_PHONONS command")
 	var outgoingPhonons []byte
+
 	for _, k := range keyIndices {
 		if int(k) >= len(c.Phonons) {
 			return nil, errors.New("keyIndex exceeds length of phonon list")
@@ -880,7 +882,6 @@ func (c *MockCard) SendPostedPhonons(recipientsPublicKey []byte, nonce uint64, k
 	}
 
 	sig, err := ecdsa.SignASN1(rand.Reader, c.identityKey, CreatePostedPhononSignatureData(recipientsPublicKey, nonceBytes, outgoingPhonons))
-
 	if err != nil {
 		return nil, err
 	}
@@ -937,10 +938,10 @@ func (c *MockCard) ReceivePhonons(transaction []byte) (err error) {
 	return nil
 }
 
-func (c *MockCard) ReceivePostedPhonons(transaction []byte) (err error) {
+func (c *MockCard) ReceivePostedPhonons(postedPacket []byte) (err error) {
 	log.Debug("mock RECEIVE_POSTED_PHONONS command")
 
-	collection, err := tlv.ParseTLVPacket(transaction)
+	collection, err := tlv.ParseTLVPacket(postedPacket)
 	if err != nil {
 		return err
 	}
@@ -985,7 +986,7 @@ func (c *MockCard) ReceivePostedPhonons(transaction []byte) (err error) {
 		return errors.New("counterparty public key is not valid ECC point")
 	}
 
-	phononTransferPacketTLV, err := tlv.ParseTLVPacket(transaction, TagTransferPhononPacket)
+	phononTransferPacketTLV, err := tlv.ParseTLVPacket(postedPacket, TagTransferPhononPacket)
 	if err != nil {
 		return err
 	}
