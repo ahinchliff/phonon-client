@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/sha512"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math/big"
@@ -42,6 +43,7 @@ type MockCard struct {
 	friendlyName    string
 	mintLimit       int
 	mintRate        int
+	nonce           uint64
 }
 
 type MockPhonon struct {
@@ -96,6 +98,42 @@ func (phonon *MockPhonon) Encode() (tlv.TLV, error) {
 	return phononDescriptionTLV, nil
 }
 
+func (phonon *MockPhonon) EncodePosted(encyptedPrivateKey []byte, iv []byte) (tlv.TLV, error) {
+	log.Debug("sending mock ENCODE_POSTED command")
+	privKeyTLV, err := tlv.NewTLV(TagPhononPrivKey, encyptedPrivateKey)
+	if err != nil {
+		log.Error("could not encode mockPhonon privKey: ", err)
+		return tlv.TLV{}, err
+	}
+	//CurveType
+	curveTypeTLV, err := tlv.NewTLV(TagCurveType, []byte{byte(phonon.CurveType)})
+	if err != nil {
+		return tlv.TLV{}, err
+	}
+
+	ivTLV, err := tlv.NewTLV(TagAesIV, iv)
+	if err != nil {
+		return tlv.TLV{}, err
+	}
+
+	//Encode internal phonon
+	phononTLV, err := TLVEncodePhononDescriptor(&phonon.Phonon)
+	if err != nil {
+		log.Error("mock could not encode inner phonon: ", phonon.Phonon)
+		return tlv.TLV{}, err
+	}
+	data := append(privKeyTLV.Encode(), curveTypeTLV.Encode()...)
+	data = append(data, phononTLV...)
+	data = append(data, ivTLV.Encode()...)
+	phononDescriptionTLV, err := tlv.NewTLV(TagPhononPrivateDescription, data)
+	if err != nil {
+		log.Error("mock could not encode phonon description: ", err)
+		return tlv.TLV{}, err
+	}
+
+	return phononDescriptionTLV, nil
+}
+
 func decodePhononTLV(privatePhononTLV []byte) (phonon MockPhonon, err error) {
 	phononTLV, err := tlv.ParseTLVPacket(privatePhononTLV, TagPhononPrivateDescription)
 	if err != nil {
@@ -104,6 +142,43 @@ func decodePhononTLV(privatePhononTLV []byte) (phonon MockPhonon, err error) {
 
 	//Parse private key for later
 	phonon.PrivateKey, err = phononTLV.FindTag(TagPhononPrivKey)
+	if err != nil {
+		log.Debug("could not parse phonon private key tlv")
+		return phonon, err
+	}
+	//Parse standard public fields and extended schema
+	publicPhonon, err := TLVDecodePublicPhononFields(phononTLV)
+	if err != nil {
+		return phonon, err
+	}
+
+	phonon.Phonon = *publicPhonon
+
+	switch phonon.CurveType {
+	case model.Secp256k1:
+		eccPrivKey, err := util.ParseECCPrivKey(phonon.PrivateKey)
+		if err != nil {
+			return phonon, err
+		}
+		phonon.PubKey, err = model.NewPhononPubKey(ethcrypto.FromECDSAPub(&eccPrivKey.PublicKey), model.Secp256k1)
+		if err != nil {
+			return phonon, err
+		}
+	case model.NativeCurve:
+		phonon.PubKey = DeriveNativePhononPubKey(phonon.PrivateKey)
+	}
+
+	return phonon, nil
+}
+
+func decodePostedPhononTLV(privatePhononTLV []byte, phononPrivateKey []byte) (phonon MockPhonon, err error) {
+	phononTLV, err := tlv.ParseTLVPacket(privatePhononTLV, TagPhononPrivateDescription)
+	if err != nil {
+		return phonon, err
+	}
+
+	//Parse private key for later
+	phonon.PrivateKey = phononPrivateKey
 	if err != nil {
 		log.Debug("could not parse phonon private key tlv")
 		return phonon, err
@@ -260,6 +335,10 @@ func (c *MockCard) IdentifyCard(nonce []byte) (cardPubKey *ecdsa.PublicKey, card
 		return c.IdentityPubKey, nil, err
 	}
 	return c.IdentityPubKey, cardSig, nil
+}
+
+func (c *MockCard) IdentifyPostedPhononNonce() (nonce uint64, err error) {
+	return c.nonce, nil
 }
 
 func (c *MockCard) InstallCertificate(signKeyFunc func([]byte) ([]byte, error)) error {
@@ -758,6 +837,78 @@ func (c *MockCard) SendPhonons(keyIndices []uint16, extendedRequest bool) (trans
 // 	return nil
 // }
 
+func (c *MockCard) PostPhonons(recipientsPublicKey []byte, nonce uint64, keyIndices []uint16) (transferPhononPackets []byte, err error) {
+	log.Debug("sending mock POST_PHONONS command")
+	var outgoingPhonons []byte
+
+	for _, k := range keyIndices {
+		if int(k) >= len(c.Phonons) {
+			return nil, errors.New("keyIndex exceeds length of phonon list")
+		}
+		if c.Phonons[k].deleted {
+			return nil, errors.New("cannot access deleted phonon")
+		}
+
+		phonon := c.Phonons[k]
+
+		iv := util.RandomKey(16)
+
+		log.Debug("...encryptedPrivateKey")
+		encryptedPrivateKey, err := crypto.EncryptData(phonon.PrivateKey, recipientsPublicKey, iv)
+		if err != nil {
+			return nil, errors.New("could not encrypt private key")
+		}
+
+		log.Debug("...phononTLV")
+		phononTLV, err := phonon.EncodePosted(encryptedPrivateKey, iv)
+		if err != nil {
+			return nil, errors.New("could not encode phonon TLV")
+		}
+
+		outgoingPhonons = append(outgoingPhonons, phononTLV.Encode()...)
+	}
+
+	phononTransferTLV, err := tlv.NewTLV(TagTransferPhononPacket, outgoingPhonons)
+
+	if err != nil {
+		return nil, errors.New("could not encode phonon transfer TLV")
+	}
+
+	nonceBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(nonceBytes, uint64(nonce))
+
+	nonceTLV, err := tlv.NewTLV(TagNonce, nonceBytes)
+	if err != nil {
+		return nil, errors.New("could not encode nonce TLV")
+	}
+
+	cardCertTLV, err := tlv.NewTLV(TagCardCertificate, c.IdentityCert.Serialize())
+	if err != nil {
+		return nil, errors.New("could not encode cert TLV")
+	}
+
+	sig, err := ecdsa.SignASN1(rand.Reader, c.identityKey, CreatePostedPhononSignatureData(recipientsPublicKey, nonceBytes, outgoingPhonons))
+	if err != nil {
+		return nil, err
+	}
+
+	sigTLV, err := tlv.NewTLV(TagECDSASig, sig)
+	if err != nil {
+		return nil, errors.New("could not encode signedMessage TLV")
+	}
+
+	data := append(nonceTLV.Encode(), phononTransferTLV.Encode()...)
+	data = append(data, cardCertTLV.Encode()...)
+	data = append(data, sigTLV.Encode()...)
+
+	//Delete sent phonons
+	for _, k := range keyIndices {
+		c.deletePhonon(int(k))
+	}
+
+	return data, nil
+}
+
 func (c *MockCard) ReceivePhonons(transaction []byte) (err error) {
 	log.Debug("mock RECEIVE_PHONONS command")
 	phononTransferPacketData, err := c.sc.Decrypt(transaction)
@@ -789,6 +940,131 @@ func (c *MockCard) ReceivePhonons(transaction []byte) (err error) {
 	for _, p := range phonons {
 		c.addPhonon(&p)
 	}
+
+	return nil
+}
+
+func (c *MockCard) ReceivePostedPhonons(postedPacket []byte) (err error) {
+	log.Debug("mock RECEIVE_POSTED_PHONONS command")
+
+	collection, err := tlv.ParseTLVPacket(postedPacket)
+	if err != nil {
+		return err
+	}
+
+	nonceBytes, err := collection.FindTag(TagNonce)
+
+	if err != nil {
+		return err
+	}
+
+	nonce := binary.BigEndian.Uint64(nonceBytes)
+
+	// check that nonce is valid
+	if nonce <= c.nonce {
+		return errors.New("transaction.nonce is less than or equal to card.postedPhononNonce")
+	}
+
+	senderCardCertRaw, err := collection.FindTag(TagCardCertificate)
+	if err != nil {
+		return errors.New("could not find certificate tlv tag")
+	}
+
+	senderCardCert, err := cert.ParseRawCardCertificate(senderCardCertRaw)
+	if err != nil {
+		return err
+	}
+
+	// check that sender's cert is valid
+	err = cert.ValidateCardCertificate(senderCardCert, gridplus.SafecardDevCAPubKey)
+	if err != nil {
+		return err
+	}
+
+	senderPubKey, err := util.ParseECCPubKey(senderCardCert.PubKey)
+	if err != nil {
+		return err
+	}
+
+	// check that sender's public key is valid
+	pubKeyValid := gridplus.ValidateECCPubKey(senderPubKey)
+	if !pubKeyValid {
+		return errors.New("counterparty public key is not valid ECC point")
+	}
+
+	phononTransferPacketTLV, err := tlv.ParseTLVPacket(postedPacket, TagTransferPhononPacket)
+	if err != nil {
+		return err
+	}
+
+	phononTLVs, err := phononTransferPacketTLV.FindTags(TagPhononPrivateDescription)
+	if err != nil {
+		return err
+	}
+
+	// parse all received phonons
+	var phonons []MockPhonon
+	for _, phononTLV := range phononTLVs {
+
+		parsedPhononTLV, err := tlv.ParseTLVPacket(phononTLV, TagPhononPrivateDescription)
+		if err != nil {
+			return err
+		}
+
+		encryptedPrivateKey, err := parsedPhononTLV.FindTag(TagPhononPrivKey)
+		if err != nil {
+			log.Debug("could not parse phonon private key tlv")
+			return err
+		}
+
+		iv, err := parsedPhononTLV.FindTag(TagAesIV)
+		if err != nil {
+			log.Debug("could not parse phonon iv tlv")
+			return err
+		}
+
+		privateKey, err := crypto.DecryptData(encryptedPrivateKey, c.identityKey.X.Bytes(), iv)
+		if err != nil {
+			return err
+		}
+
+		phonon, err := decodePostedPhononTLV(phononTLV, privateKey)
+
+		if err != nil {
+			return err
+		}
+		phonons = append(phonons, phonon)
+	}
+
+	sig, err := collection.FindTag(TagECDSASig)
+	if err != nil {
+		return err
+	}
+
+	// here I am converting the data into the format required for the signature verification
+	// there is probably an better way of doing this but I can't work it out.
+	var phononData []byte
+	for _, phononTLV := range phononTLVs {
+		phononTVL, err := tlv.NewTLV(TagPhononPrivateDescription, phononTLV)
+		if err != nil {
+			return err
+		}
+		phononData = append(phononData, phononTVL.Encode()...)
+	}
+
+	// Validate sig
+	isSigValid := ecdsa.VerifyASN1(senderPubKey, CreatePostedPhononSignatureData(c.IdentityPubKey.X.Bytes(), nonceBytes, phononData), sig)
+	if !isSigValid {
+		return errors.New("signature invalid")
+	}
+
+	// store all received phonons
+	for _, p := range phonons {
+		c.addPhonon(&p)
+	}
+
+	// update nonce
+	c.nonce = nonce
 
 	return nil
 }
@@ -904,4 +1180,9 @@ This is the process for deriving a native phonon hash, which is stored as its pu
 func DeriveNativePhononPubKey(salt []byte) *model.NativePubKey {
 	hash := sha512.Sum512(salt)
 	return &model.NativePubKey{Hash: hash[:]}
+}
+
+func CreatePostedPhononSignatureData(recipientsPublicKey []byte, nonce []byte, phonons []byte) []byte {
+	sig := append(recipientsPublicKey, nonce...)
+	return append(sig, phonons...)
 }

@@ -57,6 +57,16 @@ func Start() {
 		Help: "Initialize the active card with a PIN",
 	})
 	shell.AddCmd(&ishell.Cmd{
+		Name: "identifyCard",
+		Func: identifyCard,
+		Help: "Get active card's public key as hex",
+	})
+	shell.AddCmd(&ishell.Cmd{
+		Name: "identifyPostedPhononNonce",
+		Func: identifyPostedPhononNonce,
+		Help: "Get the card's next posted phonon nonce",
+	})
+	shell.AddCmd(&ishell.Cmd{
 		Name: "changePin",
 		Func: changeCardPIN,
 		Help: "Change the active card's PIN",
@@ -88,6 +98,18 @@ func Start() {
 		Name: "sendPhonons",
 		Func: sendPhonons,
 		Help: "Send phonons to paired card",
+	})
+	shell.AddCmd(&ishell.Cmd{
+		Name: "postPhonons",
+		Func: postPhonons,
+		Help: `Post phonons for a another card to pickup.
+		       Args: [ReceivingCardPubKey], [Nonce], [KeyIndex Array]`,
+	})
+	shell.AddCmd(&ishell.Cmd{
+		Name: "receivePostedPhonons",
+		Func: receivePostedPhonons,
+		Help: `Receive posted phonons from inbox.
+		       Args: [hex of posted phonon packet]`,
 	})
 	// shell.AddCmd(&ishell.Cmd{
 	// 	Name: "balance",

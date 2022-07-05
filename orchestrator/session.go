@@ -256,10 +256,23 @@ func (s *Session) DestroyPhonon(keyIndex uint16) (privKey *ecdsa.PrivateKey, err
 }
 
 func (s *Session) IdentifyCard(nonce []byte) (cardPubKey *ecdsa.PublicKey, cardSig *util.ECDSASignature, err error) {
+	if !s.verified() {
+		return nil, nil, card.ErrPINNotEntered
+	}
 	s.ElementUsageMtex.Lock()
 	defer s.ElementUsageMtex.Unlock()
 
 	return s.cs.IdentifyCard(nonce)
+}
+
+func (s *Session) IdentifyPostedPhononNonce() (nonce uint64, err error) {
+	if !s.verified() {
+		return 0, card.ErrPINNotEntered
+	}
+	s.ElementUsageMtex.Lock()
+	defer s.ElementUsageMtex.Unlock()
+
+	return s.cs.IdentifyPostedPhononNonce()
 }
 
 func (s *Session) InitCardPairing(receiverCert cert.CardCertificate) ([]byte, error) {
@@ -334,6 +347,26 @@ func (s *Session) SendPhonons(keyIndices []uint16) error {
 		return err
 	}
 	fmt.Println("unlockingMutex")
+	return nil
+}
+
+func (s *Session) PostPhonons(pubkey []byte, nonce uint64, keyIndices []uint16) (transferPhononPackets []byte, err error) {
+	log.Debug("sending orchestrator POST_PHONONS for mock card")
+
+	transferPhononPackets, err = s.cs.PostPhonons(pubkey, nonce, keyIndices)
+	if err != nil {
+		return nil, err
+	}
+	return transferPhononPackets, nil
+}
+
+func (s *Session) ReceivePostedPhonons(postedPacket []byte) (err error) {
+	log.Debug("sending orchestrator RECEIVE_POSTED_PHONONS for mock card")
+
+	err = s.cs.ReceivePostedPhonons(postedPacket)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
