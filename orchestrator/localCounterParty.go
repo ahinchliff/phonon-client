@@ -59,6 +59,22 @@ func (lcp *localCounterParty) ReceivePhonons(phononTransfer []byte) error {
 	return nil
 }
 
+func (lcp *localCounterParty) ReceiveFlexPhonons(flexLoad []byte) (returnLoad []byte, err error) {
+	returnLoad, err = lcp.counterSession.ResolveFlexPhonons(flexLoad)
+	if err != nil {
+		return nil, err
+	}
+	return returnLoad, nil
+}
+
+func (lcp *localCounterParty) FindFlexPhonon(sourcePubKey []byte) (returnLoad bool, err error) {
+	returnLoad, err = lcp.counterSession.FindFlexPhonon(sourcePubKey)
+	if err != nil {
+		return false, err
+	}
+	return returnLoad, nil
+}
+
 func (lcp *localCounterParty) GenerateInvoice() (invoiceData []byte, err error) {
 	return lcp.counterSession.GenerateInvoice()
 }

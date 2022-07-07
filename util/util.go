@@ -54,3 +54,18 @@ func Uint16ToBytes(i uint16) []byte {
 	binary.BigEndian.PutUint16(bytes, i)
 	return bytes
 }
+
+func Uint64ToBytes(i uint64) []byte {
+	bytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(bytes, i)
+	return bytes
+}
+
+func BytesToUint64(b []byte) (uint64, error) {
+	var value uint64
+	err := binary.Read(bytes.NewReader(b), binary.BigEndian, &value)
+	if err != nil {
+		return 0, err
+	}
+	return value, nil
+}

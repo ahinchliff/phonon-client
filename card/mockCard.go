@@ -659,11 +659,16 @@ func (c *MockCard) SetDescriptor(phonon *model.Phonon) error {
 
 	storedPhonon := &c.Phonons[phonon.KeyIndex].Phonon
 
+	if (storedPhonon.CurrencyType == 4) {
+		return fmt.Errorf("flexible phonons cannot be updated after creation %d", phonon.KeyIndex)
+	}
+
 	storedPhonon.SchemaVersion = phonon.SchemaVersion
 	storedPhonon.ExtendedSchemaVersion = phonon.ExtendedSchemaVersion
 	storedPhonon.CurrencyType = phonon.CurrencyType
 	storedPhonon.Denomination = phonon.Denomination
 	storedPhonon.ExtendedSchemaVersion = phonon.ExtendedSchemaVersion
+	storedPhonon.ExtendedTLV = phonon.ExtendedTLV
 
 	return nil
 }
@@ -684,6 +689,70 @@ func (c *MockCard) ListPhonons(currencyType model.CurrencyType, lessThanValue ui
 		}
 	}
 	return ret, nil
+}
+
+func (c *MockCard) UpdateFlexPhonons(keyIndexSend uint16, keyIndexKeep uint16, value uint64) (err error) {
+	log.Debug("mock FLEX_PHONONS command")
+	//SourcePublicKey = 0x58
+
+	// check that they are both currency type 4
+	if (c.Phonons[keyIndexSend].CurrencyType != 4 || c.Phonons[keyIndexKeep].CurrencyType != 4) {
+		return errors.New("only flexible phonons can flex")
+	}
+
+	// check that indices are different
+	if (keyIndexSend == keyIndexKeep) {
+		return errors.New("flex phonons must be different")
+	}
+
+	// check that both phonons have same source public key tag
+	sendTLVs := tlv.EncodeTLVList(c.Phonons[keyIndexSend].ExtendedTLV...)
+	sendCollection, err := tlv.ParseTLVPacket(sendTLVs)
+	sendTagPubKey, err := sendCollection.FindTag(model.SourcePublicKey)
+	if err != nil {
+	 		return err
+	}
+
+	keepTLVs := tlv.EncodeTLVList(c.Phonons[keyIndexKeep].ExtendedTLV...)
+	keepCollection, err := tlv.ParseTLVPacket(keepTLVs)
+	keepTagPubKey, err := keepCollection.FindTag(model.SourcePublicKey)
+	if err != nil {
+			return err
+	}
+
+	if (string(sendTagPubKey) != string(keepTagPubKey)) {
+		return errors.New("flex values can only move between flex phonons with the same public key")
+	}
+
+	// check that value is greater than 0
+	if (value <= 0) {
+		return errors.New("flex value must be positive")
+	}
+
+	// check that sending phonon has enough value
+	if (c.Phonons[keyIndexSend].Denomination.Value().Cmp(new(big.Int).SetUint64(value)) == -1) {
+			return errors.New("sending phonon does not have enough value to flex")
+	}
+
+	// decrement send
+	newSendBalance := big.NewInt(0).Sub(c.Phonons[keyIndexSend].Denomination.Value(), new(big.Int).SetUint64(value))
+	newSendDenomination, err := model.NewDenomination(newSendBalance)
+	if err != nil {
+		log.Debug("could not denominate the new balance for sending flex phonon")
+		return err
+	}
+	c.Phonons[keyIndexSend].Denomination = newSendDenomination
+
+	// increment keep
+	newKeepBalance := big.NewInt(0).Add(c.Phonons[keyIndexKeep].Denomination.Value(), new(big.Int).SetUint64(value))
+	newKeepDenomination, err := model.NewDenomination(newKeepBalance)
+	if err != nil {
+		log.Debug("could not denominate the new balance for keeping flex phonon")
+		return err
+	}
+	c.Phonons[keyIndexKeep].Denomination = newKeepDenomination
+
+	return nil
 }
 
 func (c *MockCard) GetPhononPubKey(keyIndex uint16, crv model.CurveType) (pubkey model.PhononPubKey, err error) {

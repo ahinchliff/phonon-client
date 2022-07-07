@@ -3,7 +3,6 @@ package repl
 import (
 	"fmt"
 	"strings"
-
 	"github.com/GridPlus/phonon-client/orchestrator"
 
 	ishell "github.com/abiosoft/ishell/v2"
@@ -81,6 +80,11 @@ func Start() {
 		Name: "create",
 		Func: createPhonon,
 		Help: "Create a new phonon key on active card",
+	})
+	shell.AddCmd(&ishell.Cmd{
+		Name: "flexPhonons",
+		Func: flexPhonons,
+		Help: "Swap value using flexible phonons",
 	})
 	shell.AddCmd(&ishell.Cmd{
 		Name: "setDescriptor",

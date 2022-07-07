@@ -107,6 +107,30 @@ func (c *RemoteConnection) requestReceivePhonons(payload []byte) error {
 	return ret.Err
 }
 
+func (c *RemoteConnection) requestFindFlexPhonon(payload []byte) (result bool, err error) {
+	req := &model.RequestFindFlexPhonon {
+		Ret:     make(chan model.ResponseFindFlexPhonon),
+		Payload: payload,
+	}
+	c.logger.Debug("Requesting Find Flex Phonon")
+	c.sessionRequestChan <- req
+	ret := <-req.Ret
+	return ret.Returnload, ret.Err
+}
+
+
+
+func (c *RemoteConnection) requestFlexPhonons(payload []byte, phononPubKey model.PhononPubKey,sourcePubKey []byte) (returnLoad []byte, err error) {
+	req := &model.RequestFlexPhonons{
+		Ret:     make(chan model.ResponseFlexPhonons),
+		Payload: payload,
+	}
+	c.logger.Debug("Requesting Phonons be Flexed")
+	c.sessionRequestChan <- req
+	ret := <-req.Ret
+	return ret.Returnload, ret.Err
+}
+
 func (c *RemoteConnection) requestGetName() (string, error) {
 	req := &model.RequestGetName{
 		Ret: make(chan model.ResponseGetName),
@@ -244,6 +268,8 @@ func (c *RemoteConnection) process(msg v1.Message) {
 		c.phononAckChan <- true
 	case v1.RequestReceivePhonon:
 		c.processReceivePhonons(msg)
+	case v1.RequestFlexPhonons:
+		c.processReceiveFlexPhonons(msg)
 	case v1.RequestVerifyPaired:
 		c.processRequestVerifyPaired(msg)
 	case v1.MessageDisconnected:
@@ -339,6 +365,16 @@ func (c *RemoteConnection) processFinalizeCardPair(msg v1.Message) {
 }
 
 func (c *RemoteConnection) processReceivePhonons(msg v1.Message) {
+	// would check for status to be paired, but for replayability, I'm not entirely sure this is necessary
+	err := c.requestReceivePhonons(msg.Payload)
+	if err != nil {
+		c.logger.Error(err.Error())
+		return
+	}
+	c.sendMessage(v1.MessagePhononAck, []byte{})
+}
+
+func (c *RemoteConnection) processReceiveFlexPhonons(msg v1.Message) {
 	// would check for status to be paired, but for replayability, I'm not entirely sure this is necessary
 	err := c.requestReceivePhonons(msg.Payload)
 	if err != nil {
@@ -460,6 +496,29 @@ func (c *RemoteConnection) ReceivePhonons(PhononTransfer []byte) error {
 		return nil
 	}
 }
+
+func (c *RemoteConnection) FindFlexPhonon(PhononTransfer []byte) (returnLoad bool, err error) {
+	c.sendMessage(v1.RequestFindFlexPhonon, PhononTransfer)
+	select {
+	case <-time.After(10 * time.Second):
+		c.logger.Error("unable to verify remote recipt of phonons")
+		return false, ErrTimeout
+	case <-c.phononAckChan:
+		return returnLoad, nil
+	}
+}
+
+func (c *RemoteConnection) ReceiveFlexPhonons(payload []byte) (returnLoad []byte, err error) {
+	c.sendMessage(v1.RequestFlexPhonons, payload)
+	select {
+	case <-time.After(10 * time.Second):
+		c.logger.Error("unable to verify remote recipt of phonons")
+		return nil, ErrTimeout
+	case <-c.phononAckChan:
+		return returnLoad, nil
+	}
+}
+
 
 func (c *RemoteConnection) GenerateInvoice() (invoiceData []byte, err error) {
 	// todo:

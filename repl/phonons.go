@@ -108,6 +108,21 @@ func setDescriptor(c *ishell.Context) {
 		Denomination: denomination,
 	}
 
+	if (currencyType == 4) {
+		c.Println("What is source private key hex for this flexible phonon?")
+		// Example for Testing:
+		// 03a0b699905d81fed15c814725f0e09bd275921f4b0657b364e4a80183eb0ebb
+	  sourcePrivKeyInput := c.ReadLine()
+		sourceTLV, err := model.TagFlexSourcePublicKey(sourcePrivKeyInput)
+		if err != nil {
+			c.Println("could not create tlv for source private key", err)
+			return
+		}
+		c.Println(sourceTLV)
+		p.ExtendedTLV = append(p.ExtendedTLV, sourceTLV)
+	}
+
+
 	err = activeCard.SetDescriptor(p)
 	if err != nil {
 		c.Println("could not set descriptor: ", err)

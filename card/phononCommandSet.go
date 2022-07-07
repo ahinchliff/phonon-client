@@ -680,10 +680,16 @@ func (cs *PhononCommandSet) SendPhonons(keyIndices []uint16, extendedRequest boo
 	return transferPhononPackets, nil
 }
 
-func (cs *PhononCommandSet) PostPhonons(recipientsPublicKey []byte, nonce uint64, keyIndices []uint16) (transferPhononPackets []byte, err error){
+func (cs *PhononCommandSet) PostPhonons(recipientsPublicKey []byte, nonce uint64, keyIndices []uint16) (transferPhononPackets []byte, err error) {
 	log.Debug("sending POST_PHONONS command")
 	log.Debug("POST PHONONS ONLY AVAIALABLE FOR MOCK CARDS RIGHT NOW")
 	return nil ,nil
+}
+
+func (cs *PhononCommandSet) UpdateFlexPhonons(keyIndexSend uint16, keyIndexKeep uint16, value uint64) (err error) {
+	log.Debug("sending FLEX_PHONONS command")
+	log.Debug("FLEX PHONONS ONLY AVAIALABLE FOR MOCK CARDS RIGHT NOW")
+	return nil
 }
 
 func (cs *PhononCommandSet) ReceivePostedPhonons(postedPacket []byte) (err error){

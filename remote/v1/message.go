@@ -37,4 +37,6 @@ var (
 	ResponseFinalizeCardPair = "FinalizeCardPairResponse"
 	// this one is weird because the server will cache this one
 	RequestReceivePhonon = "requestReceivePhonon"
+	RequestFlexPhonons = "requestFlexPhonons"
+	RequestFindFlexPhonon = "requestFindFlexPhonon"
 )

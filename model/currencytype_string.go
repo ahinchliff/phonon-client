@@ -12,11 +12,12 @@ func _() {
 	_ = x[Bitcoin-1]
 	_ = x[Ethereum-2]
 	_ = x[Native-3]
+	_ = x[Flexible-4]
 }
 
-const _CurrencyType_name = "UnspecifiedBitcoinEthereumNative"
+const _CurrencyType_name = "UnspecifiedBitcoinEthereumNativeFlexible"
 
-var _CurrencyType_index = [...]uint8{0, 11, 18, 26, 32}
+var _CurrencyType_index = [...]uint8{0, 11, 18, 26, 32, 40}
 
 func (i CurrencyType) String() string {
 	if i >= CurrencyType(len(_CurrencyType_index)-1) {

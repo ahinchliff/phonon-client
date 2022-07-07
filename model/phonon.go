@@ -117,6 +117,7 @@ const (
 	Bitcoin     CurrencyType = 0x0001
 	Ethereum    CurrencyType = 0x0002
 	Native      CurrencyType = 0x0003
+	Flexible      CurrencyType = 0x0004
 )
 
 type CurveType uint8

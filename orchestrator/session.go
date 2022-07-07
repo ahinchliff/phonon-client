@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"net/url"
 	"sync"
+	"math/big"
 
 	"github.com/GridPlus/phonon-client/card"
 	"github.com/GridPlus/phonon-client/cert"
 	"github.com/GridPlus/phonon-client/chain"
 	"github.com/GridPlus/phonon-client/model"
+	"github.com/GridPlus/phonon-client/tlv"
 	remote "github.com/GridPlus/phonon-client/remote/v1/client"
 	"github.com/GridPlus/phonon-client/util"
 
@@ -360,6 +362,202 @@ func (s *Session) PostPhonons(pubkey []byte, nonce uint64, keyIndices []uint16) 
 	return transferPhononPackets, nil
 }
 
+func (s *Session) SendFlexPhonon(keyIndexSender uint16, value uint64) (err error) {
+	log.Debug("initiating orchestrator Flexing phonons")
+
+	// Initiated by Sending Party
+	if !s.verified() && s.RemoteCard != nil {
+		return ErrCardNotPairedToCard
+	}
+
+	// Verify Pairing
+	err = s.RemoteCard.VerifyPaired()
+	if err != nil {
+		return err
+	}
+
+	// check that value is greater than 0
+	if (value < 0) {
+		return errors.New("flex value must not be negative")
+	}
+
+	var setCurrencyType model.CurrencyType = 4
+	var lessThanValue uint64
+	var greaterThanValue uint64
+
+	// check sending phonon
+	// TODO: see if you can access s.cs.Phonons[keyIndexSender]
+	sendingPhonons, err := s.cs.ListPhonons(setCurrencyType, lessThanValue, greaterThanValue, false)
+
+	// check currency type
+	if (sendingPhonons[keyIndexSender].CurrencyType != 4) {
+		return errors.New("only flex phonons may may flexed")
+	}
+
+	// check sending phonon has enough value
+	if (sendingPhonons[keyIndexSender].Denomination.Value().Cmp(new(big.Int).SetUint64(value)) == -1) {
+			return errors.New("sending phonon does not have enough value to flex")
+	}
+
+	// get phonon public key for payload
+	sendPhononPublicKey := sendingPhonons[keyIndexSender].PubKey
+	log.Debug(sendPhononPublicKey)
+
+	// get source public key from phonon tag for payload
+	sendTLVs := tlv.EncodeTLVList(sendingPhonons[keyIndexSender].ExtendedTLV...)
+	sendCollection, err := tlv.ParseTLVPacket(sendTLVs)
+	if err != nil {
+			return err
+	}
+	sendTagPubKey, err := sendCollection.FindTag(model.SourcePublicKey)
+	if err != nil {
+			return err
+	}
+
+	// TODO: check if receiving card has phonon with same sendTagPubKey
+	hasPhononMatch, err := s.RemoteCard.FindFlexPhonon(sendTagPubKey)
+	if err != nil {
+		log.Debug("error looking for flex phonon on remote card")
+		return err
+	}
+	if (hasPhononMatch == false) {
+		return errors.New("remote card does not have a flexible phonon with matching source pubkey")
+	}
+
+	log.Debug("locking mutex")
+	s.ElementUsageMtex.Lock()
+	defer s.ElementUsageMtex.Unlock()
+
+
+	// sending party preps flexible phonon
+	var keyIndices []uint16
+	keyIndices = append(keyIndices,uint16(keyIndexSender))
+	phononTransferPacket, err := s.cs.SendPhonons(keyIndices, false)
+	if err != nil {
+		return err
+	}
+
+	// sending party builds entire payload
+	var payload []byte
+	payload = append(payload, sendPhononPublicKey.Bytes()[:]...)
+	payload = append(payload, sendTagPubKey[:]...)
+	payload = append(payload, util.Uint64ToBytes(value)[:]...)
+	payload = append(payload, phononTransferPacket[:]...)
+
+	// receiving party receives and handles payload
+	returnLoad, err := s.RemoteCard.ReceiveFlexPhonons(payload)
+	if err != nil {
+		log.Debug("error receiving phonons on remote")
+		return err
+	}
+
+	// sending party gets their phonon back with updated value
+	err = s.cs.ReceivePhonons(returnLoad)
+
+	return nil
+}
+
+func (s *Session) ResolveFlexPhonons(payload []byte) (returnLoad []byte, err error) {
+	log.Debug("sending BALANCE_PHONONS")
+
+	if !s.verified() && s.RemoteCard != nil {
+		return nil, ErrCardNotPairedToCard
+	}
+	s.ElementUsageMtex.Lock()
+	defer s.ElementUsageMtex.Unlock()
+
+	// receiving party parses payload
+	var sendPhononPublicKey = payload[:65]
+	var sendTagPubKey = payload[65:130]
+	var valueBytes = payload[130:138]
+	var phononTransferPacket = payload[138:len(payload)]
+
+	// receiving party gets senders phonon
+	err = s.cs.ReceivePhonons(phononTransferPacket)
+
+	var setCurrencyType model.CurrencyType = 4
+	var lessThanValue uint64
+	var greaterThanValue uint64
+
+	var keepKeyIndex uint16
+	var sendKeyIndex uint16
+
+	// receiving party identifies relevant phonons
+	receiversPhonons, err := s.cs.ListPhonons(setCurrencyType, lessThanValue, greaterThanValue, false)
+	for _, phonon := range receiversPhonons {
+		recvrTLVs := tlv.EncodeTLVList(phonon.ExtendedTLV...)
+		recvrCollection, err := tlv.ParseTLVPacket(recvrTLVs)
+		if err != nil {
+				return nil, err
+		}
+		recvrTagPubKey, err := recvrCollection.FindTag(model.SourcePublicKey)
+		if err != nil {
+				return nil, err
+		}
+
+		// phonon has matching source pub key
+		if (string(sendTagPubKey) == string(recvrTagPubKey)) {
+			if (string(phonon.PubKey.Bytes()) == string(sendPhononPublicKey)) {
+				// this phonon must be sent back to sender
+				sendKeyIndex = phonon.KeyIndex
+			} else {
+				keepKeyIndex = phonon.KeyIndex
+			}
+		}
+	}
+
+	// receiving party updates identified flexible phonons
+	value, err := util.BytesToUint64(valueBytes)
+	if err != nil {
+		return nil, err
+	}
+	err = s.cs.UpdateFlexPhonons(sendKeyIndex, keepKeyIndex, value)
+	if err != nil {
+		return nil, err
+	}
+
+
+	// receiving party returns the senders flexible phonon
+	var keyIndices []uint16
+	keyIndices = append(keyIndices, sendKeyIndex)
+	returnLoad, err = s.cs.SendPhonons(keyIndices, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return returnLoad, nil
+}
+
+func (s *Session) FindFlexPhonon(sourcePublicKeyBytes []byte) (returnLoad bool, err error) {
+	log.Debug("sending FIND_FLEX_PHONON")
+
+	var setCurrencyType model.CurrencyType = 4
+	var lessThanValue uint64
+	var greaterThanValue uint64
+
+	// look for phonon with matching source public key in tlv
+	returnLoad = false
+	receiversPhonons, err := s.cs.ListPhonons(setCurrencyType, lessThanValue, greaterThanValue, false)
+	for _, phonon := range receiversPhonons {
+		recvrTLVs := tlv.EncodeTLVList(phonon.ExtendedTLV...)
+		recvrCollection, err := tlv.ParseTLVPacket(recvrTLVs)
+		if err != nil {
+				return false, err
+		}
+		recvrTagPubKey, err := recvrCollection.FindTag(model.SourcePublicKey)
+		if err != nil {
+				return false, err
+		}
+
+		// check for matching source pub key
+		if (string(sourcePublicKeyBytes) == string(recvrTagPubKey)) {
+			log.Debug("found eligible phonon with source pubkey match")
+			returnLoad = true
+		}
+	}
+	return returnLoad, nil
+}
+
 func (s *Session) ReceivePostedPhonons(postedPacket []byte) (err error) {
 	log.Debug("sending orchestrator RECEIVE_POSTED_PHONONS for mock card")
 
@@ -605,6 +803,26 @@ func (s *Session) handleRequest(r model.SessionRequest) {
 		}
 		var resp model.ResponseReceivePhonons
 		resp.Err = s.ReceivePhonons(req.Payload)
+		req.Ret <- resp
+	case "RequestFlexPhonons":
+		req, ok := r.(*model.RequestFlexPhonons)
+		if !ok {
+			panic("this shouldn't happen.")
+		}
+		var resp model.ResponseFlexPhonons
+		returnLoad, err := s.ResolveFlexPhonons(req.Payload)
+		resp.Returnload = returnLoad
+		resp.Err = err
+		req.Ret <- resp
+	case "RequestFindFlexPhonon":
+		req, ok := r.(*model.RequestFindFlexPhonon)
+		if !ok {
+			panic("this shouldn't happen.")
+		}
+		var resp model.ResponseFindFlexPhonon
+		returnLoad, err := s.FindFlexPhonon(req.Payload)
+		resp.Returnload = returnLoad
+		resp.Err = err
 		req.Ret <- resp
 	case "RequestGetName":
 		req, ok := r.(*model.RequestGetName)
