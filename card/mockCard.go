@@ -1055,7 +1055,7 @@ func (c *MockCard) ReceivePostedPhonons(postedPacket []byte) (err error) {
 	}
 
 	// Validate sig
-	isSigValid := ecdsa.VerifyASN1(senderPubKey, CreatePostedPhononSignatureData(c.IdentityPubKey.X.Bytes(), nonceBytes, phononData), sig)
+	isSigValid := ecdsa.VerifyASN1(senderPubKey, CreatePostedPhononSignatureData(ethcrypto.FromECDSAPub(c.IdentityPubKey), nonceBytes, phononData), sig)
 	if !isSigValid {
 		return errors.New("signature invalid")
 	}
