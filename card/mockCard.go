@@ -653,6 +653,11 @@ func (c *MockCard) CreatePhonon(curveType model.CurveType) (keyIndex uint16, pub
 }
 
 func (c *MockCard) SetDescriptor(phonon *model.Phonon) error {
+
+	if (storedPhonon.CurrencyType == 5) {
+		return fmt.Errorf("setDescriptor is not allowed for branded phonons %d", phonon.KeyIndex)
+	}
+
 	if int(phonon.KeyIndex) >= len(c.Phonons) || c.Phonons[phonon.KeyIndex].deleted {
 		return fmt.Errorf("no phonon at index %d", phonon.KeyIndex)
 	}
