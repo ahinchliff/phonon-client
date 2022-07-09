@@ -22,6 +22,25 @@ func createPhonon(c *ishell.Context) {
 	c.Println("Public Key: ", pubKey)
 }
 
+func createPhononSpecial(c *ishell.Context) {
+	if ready := checkActiveCard(c); !ready {
+		return
+	}
+
+	specialTypes := []string{"Branded"}
+
+	selection := c.MultiChoice(specialTypes, "please select an available card")
+
+	if selection == -1 {
+		c.Println("no special type selected")
+	} else if selection == 0 {
+
+		currencyType := model.CurrencyType(5)
+		createBrandedPhonon(c, currencyType)
+	}
+
+}
+
 func listPhonons(c *ishell.Context) {
 	if ready := checkActiveCard(c); !ready {
 		return

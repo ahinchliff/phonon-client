@@ -654,7 +654,7 @@ func (c *MockCard) CreatePhonon(curveType model.CurveType) (keyIndex uint16, pub
 
 func (c *MockCard) SetDescriptor(phonon *model.Phonon) error {
 
-	if (storedPhonon.CurrencyType == 5) {
+	if (phonon.CurrencyType == 5) {
 		return fmt.Errorf("setDescriptor is not allowed for branded phonons %d", phonon.KeyIndex)
 	}
 
