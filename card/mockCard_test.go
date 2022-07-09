@@ -59,8 +59,7 @@ func TestPostedPhononFlow(t *testing.T) {
 		t.Error(err)
 	}
 
-	// todo - work out correct way to pass in recipients public key
-	transaction, err := senderCard.PostPhonons(recipientCard.IdentityPubKey.X.Bytes(), 1, []uint16{0})
+	transaction, err := senderCard.PostPhonons(recipientCard.IdentityPubKey, 1, []uint16{0})
 
 	if err != nil {
 		t.Error(err)

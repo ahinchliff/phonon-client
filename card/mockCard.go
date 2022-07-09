@@ -837,9 +837,11 @@ func (c *MockCard) SendPhonons(keyIndices []uint16, extendedRequest bool) (trans
 // 	return nil
 // }
 
-func (c *MockCard) PostPhonons(recipientsPublicKey []byte, nonce uint64, keyIndices []uint16) (transferPhononPackets []byte, err error) {
+func (c *MockCard) PostPhonons(recipientsPublicKey *ecdsa.PublicKey, nonce uint64, keyIndices []uint16) (transferPhononPackets []byte, err error) {
 	log.Debug("sending mock POST_PHONONS command")
 	var outgoingPhonons []byte
+
+	recipientsPublicKeyBytes := ethcrypto.FromECDSAPub(recipientsPublicKey)
 
 	for _, k := range keyIndices {
 		if int(k) >= len(c.Phonons) {
@@ -854,7 +856,7 @@ func (c *MockCard) PostPhonons(recipientsPublicKey []byte, nonce uint64, keyIndi
 		iv := util.RandomKey(16)
 
 		log.Debug("...encryptedPrivateKey")
-		encryptedPrivateKey, err := crypto.EncryptData(phonon.PrivateKey, recipientsPublicKey, iv)
+		encryptedPrivateKey, err := crypto.EncryptData(phonon.PrivateKey, recipientsPublicKeyBytes, iv)
 		if err != nil {
 			return nil, errors.New("could not encrypt private key")
 		}
@@ -871,7 +873,7 @@ func (c *MockCard) PostPhonons(recipientsPublicKey []byte, nonce uint64, keyIndi
 	nonceBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(nonceBytes, uint64(nonce))
 
-	sig, err := ecdsa.SignASN1(rand.Reader, c.identityKey, CreatePostedPhononSignatureData(recipientsPublicKey, nonceBytes, outgoingPhonons))
+	sig, err := ecdsa.SignASN1(rand.Reader, c.identityKey, CreatePostedPhononSignatureData(recipientsPublicKeyBytes, nonceBytes, outgoingPhonons))
 	if err != nil {
 		return nil, err
 	}

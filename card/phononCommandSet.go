@@ -415,7 +415,7 @@ func (cs *PhononCommandSet) IdentifyCard(nonce []byte) (cardPubKey *ecdsa.Public
 	return cardPubKey, cardSig, nil
 }
 
-func (cs *PhononCommandSet) IdentifyPostedPhononNonce() (nonce uint64, err error){
+func (cs *PhononCommandSet) IdentifyPostedPhononNonce() (nonce uint64, err error) {
 	log.Debug("sending IDENTIFY_POSTED_PHONON_NONCE command")
 	log.Debug("POST PHONONS ONLY AVAIALABLE FOR MOCK CARDS RIGHT NOW")
 	return 0, nil
@@ -680,13 +680,13 @@ func (cs *PhononCommandSet) SendPhonons(keyIndices []uint16, extendedRequest boo
 	return transferPhononPackets, nil
 }
 
-func (cs *PhononCommandSet) PostPhonons(recipientsPublicKey []byte, nonce uint64, keyIndices []uint16) (transferPhononPackets []byte, err error){
+func (cs *PhononCommandSet) PostPhonons(recipientsPublicKey *ecdsa.PublicKey, nonce uint64, keyIndices []uint16) (transferPhononPackets []byte, err error) {
 	log.Debug("sending POST_PHONONS command")
 	log.Debug("POST PHONONS ONLY AVAIALABLE FOR MOCK CARDS RIGHT NOW")
-	return nil ,nil
+	return nil, nil
 }
 
-func (cs *PhononCommandSet) ReceivePostedPhonons(postedPacket []byte) (err error){
+func (cs *PhononCommandSet) ReceivePostedPhonons(postedPacket []byte) (err error) {
 	log.Debug("sending RECEIVE_POSTED_PHONONS command")
 	log.Debug("RECEIVE POSTED PHONONS ONLY AVAIALABLE FOR MOCK CARDS RIGHT NOW")
 	return nil
