@@ -40,6 +40,12 @@ func createBrandedPhonon(c *ishell.Context, currencyType model.CurrencyType) {
   }
   denomination, err := model.NewDenomination(big.NewInt(int64(value)))
 
-  activeCard.CreatePhononSpecial(currencyType, denomination, extendedTLV)
+  p := &model.Phonon{
+    CurrencyType: currencyType,
+    Denomination: denomination,
+    ExtendedTLV: extendedTLV,
+  }
+
+  activeCard.CreatePhononSpecial(p)
 
 }

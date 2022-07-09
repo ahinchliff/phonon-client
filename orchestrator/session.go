@@ -218,12 +218,15 @@ func (s *Session) CreatePhonon() (keyIndex uint16, pubkey model.PhononPubKey, er
 	return s.cs.CreatePhonon(model.Secp256k1)
 }
 
-func (s *Session) CreatePhononSpecial(currencyType model.CurrencyType, denomination model.Denomination, extendedTLV tlv.TLVList) (err error) {
-		log.Debug("initiating orchestrator CreatePhononSpecial")
-		log.Debug(currencyType)
-		log.Debug(denomination)
-		log.Debug(extendedTLV)
-		return nil
+func (s *Session) CreatePhononSpecial(p *model.Phonon) (keyIndex uint16, pubkey model.PhononPubKey, err error) {
+
+	if !s.verified() {
+		return 0, nil, card.ErrPINNotEntered
+	}
+	s.ElementUsageMtex.Lock()
+	defer s.ElementUsageMtex.Unlock()
+
+	return s.cs.CreatePhononSpecial(model.Secp256k1, p)
 }
 
 func (s *Session) SetDescriptor(p *model.Phonon) error {
