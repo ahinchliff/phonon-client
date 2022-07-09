@@ -853,16 +853,14 @@ func (c *MockCard) PostPhonons(recipientsPublicKey *ecdsa.PublicKey, nonce uint6
 
 		phonon := c.Phonons[k]
 
-		iv := util.RandomKey(16)
+		salt := util.RandomKey(16)
 
-		log.Debug("...encryptedPrivateKey")
-		encryptedPrivateKey, err := crypto.EncryptData(phonon.PrivateKey, recipientsPublicKeyBytes, iv)
+		encryptedPrivateKey, err := crypto.EncryptData(phonon.PrivateKey, recipientsPublicKeyBytes, salt)
 		if err != nil {
 			return nil, errors.New("could not encrypt private key")
 		}
 
-		log.Debug("...phononTLV")
-		phononTLV, err := phonon.EncodePosted(encryptedPrivateKey, iv)
+		phononTLV, err := phonon.EncodePosted(encryptedPrivateKey, salt)
 		if err != nil {
 			return nil, errors.New("could not encode phonon TLV")
 		}
