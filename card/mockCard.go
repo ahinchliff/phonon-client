@@ -868,14 +868,19 @@ func (c *MockCard) PostPhonons(recipientsPublicKey []byte, nonce uint64, keyIndi
 		outgoingPhonons = append(outgoingPhonons, phononTLV.Encode()...)
 	}
 
+	nonceBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(nonceBytes, uint64(nonce))
+
+	sig, err := ecdsa.SignASN1(rand.Reader, c.identityKey, CreatePostedPhononSignatureData(recipientsPublicKey, nonceBytes, outgoingPhonons))
+	if err != nil {
+		return nil, err
+	}
+
 	phononTransferTLV, err := tlv.NewTLV(TagTransferPhononPacket, outgoingPhonons)
 
 	if err != nil {
 		return nil, errors.New("could not encode phonon transfer TLV")
 	}
-
-	nonceBytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(nonceBytes, uint64(nonce))
 
 	nonceTLV, err := tlv.NewTLV(TagNonce, nonceBytes)
 	if err != nil {
@@ -885,11 +890,6 @@ func (c *MockCard) PostPhonons(recipientsPublicKey []byte, nonce uint64, keyIndi
 	cardCertTLV, err := tlv.NewTLV(TagCardCertificate, c.IdentityCert.Serialize())
 	if err != nil {
 		return nil, errors.New("could not encode cert TLV")
-	}
-
-	sig, err := ecdsa.SignASN1(rand.Reader, c.identityKey, CreatePostedPhononSignatureData(recipientsPublicKey, nonceBytes, outgoingPhonons))
-	if err != nil {
-		return nil, err
 	}
 
 	sigTLV, err := tlv.NewTLV(TagECDSASig, sig)
