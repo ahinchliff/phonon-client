@@ -350,10 +350,10 @@ func (s *Session) SendPhonons(keyIndices []uint16) error {
 	return nil
 }
 
-func (s *Session) PostPhonons(pubkey []byte, nonce uint64, keyIndices []uint16) (transferPhononPackets []byte, err error) {
+func (s *Session) PostPhonons(recipientPubKey []byte, nonce uint64, keyIndices []uint16) (transferPhononPackets []byte, err error) {
 	log.Debug("sending orchestrator POST_PHONONS for mock card")
 
-	transferPhononPackets, err = s.cs.PostPhonons(pubkey, nonce, keyIndices)
+	transferPhononPackets, err = s.cs.PostPhonons(recipientPubKey, nonce, keyIndices)
 	if err != nil {
 		return nil, err
 	}
