@@ -118,6 +118,7 @@ const (
 	Ethereum    CurrencyType = 0x0002
 	Native      CurrencyType = 0x0003
 	Flexible      CurrencyType = 0x0004
+	Branded      CurrencyType = 0x0005
 )
 
 type CurveType uint8
