@@ -265,14 +265,14 @@ func (s *Session) IdentifyCard(nonce []byte) (cardPubKey *ecdsa.PublicKey, cardS
 	return s.cs.IdentifyCard(nonce)
 }
 
-func (s *Session) IdentifyPostedPhononNonce() (nonce uint64, err error) {
+func (s *Session) GetPostedPhononNonce() (nonce uint64, err error) {
 	if !s.verified() {
 		return 0, card.ErrPINNotEntered
 	}
 	s.ElementUsageMtex.Lock()
 	defer s.ElementUsageMtex.Unlock()
 
-	return s.cs.IdentifyPostedPhononNonce()
+	return s.cs.GetPostedPhononNonce()
 }
 
 func (s *Session) InitCardPairing(receiverCert cert.CardCertificate) ([]byte, error) {

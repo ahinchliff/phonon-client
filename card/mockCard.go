@@ -337,7 +337,7 @@ func (c *MockCard) IdentifyCard(nonce []byte) (cardPubKey *ecdsa.PublicKey, card
 	return c.IdentityPubKey, cardSig, nil
 }
 
-func (c *MockCard) IdentifyPostedPhononNonce() (nonce uint64, err error) {
+func (c *MockCard) GetPostedPhononNonce() (nonce uint64, err error) {
 	return c.nonce, nil
 }
 

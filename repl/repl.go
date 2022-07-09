@@ -62,8 +62,8 @@ func Start() {
 		Help: "Get active card's public key as hex",
 	})
 	shell.AddCmd(&ishell.Cmd{
-		Name: "identifyPostedPhononNonce",
-		Func: identifyPostedPhononNonce,
+		Name: "getPostedPhononNonce",
+		Func: getPostedPhononNonce,
 		Help: "Get the card's next posted phonon nonce",
 	})
 	shell.AddCmd(&ishell.Cmd{

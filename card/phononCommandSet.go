@@ -415,7 +415,7 @@ func (cs *PhononCommandSet) IdentifyCard(nonce []byte) (cardPubKey *ecdsa.Public
 	return cardPubKey, cardSig, nil
 }
 
-func (cs *PhononCommandSet) IdentifyPostedPhononNonce() (nonce uint64, err error) {
+func (cs *PhononCommandSet) GetPostedPhononNonce() (nonce uint64, err error) {
 	log.Debug("sending IDENTIFY_POSTED_PHONON_NONCE command")
 	log.Debug("POST PHONONS ONLY AVAIALABLE FOR MOCK CARDS RIGHT NOW")
 	return 0, nil

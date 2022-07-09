@@ -100,12 +100,12 @@ func identifyCard(c *ishell.Context) {
 	return
 }
 
-func identifyPostedPhononNonce(c *ishell.Context) {
+func getPostedPhononNonce(c *ishell.Context) {
 	if ready := checkActiveCard(c); !ready {
 		return
 	}
 
-	nonce, err := activeCard.IdentifyPostedPhononNonce()
+	nonce, err := activeCard.GetPostedPhononNonce()
 	if err != nil {
 		c.Println("error getting posted phonon nonce: ", err)
 		return
