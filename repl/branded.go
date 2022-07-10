@@ -22,13 +22,11 @@ func createBrandedPhonon(c *ishell.Context, currencyType model.CurrencyType) {
   // 03a0b699905d81fed15c814725f0e09bd275921f4b0657b364e4a80183eb0ebb
   sourcePrivKeyInput := c.ReadLine()
 
-  extendedTLV := tlv.TLVList{}
-  sourceTLV, err := model.TagFlexSourcePublicKey(sourcePrivKeyInput)
-  if err != nil {
-    c.Println("could not create tlv for source private key", err)
+  // check priv key length
+  if (len(sourcePrivKeyInput) != 64) {
+    c.Println("your private key must be 64 characters long")
     return
   }
-  extendedTLV = append(extendedTLV, sourceTLV)
 
   c.Println("What is the value of this branded phonon?")
   valueInput := c.ReadLine()
@@ -40,12 +38,14 @@ func createBrandedPhonon(c *ishell.Context, currencyType model.CurrencyType) {
   }
   denomination, err := model.NewDenomination(big.NewInt(int64(value)))
 
+  extendedTLV := tlv.TLVList{}
+
   p := &model.Phonon{
     CurrencyType: currencyType,
     Denomination: denomination,
     ExtendedTLV: extendedTLV,
   }
 
-  activeCard.CreatePhononSpecial(p)
+  activeCard.CreatePhononWithSetDescriptor(p, sourcePrivKeyInput)
 
 }

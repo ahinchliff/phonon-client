@@ -218,7 +218,7 @@ func (s *Session) CreatePhonon() (keyIndex uint16, pubkey model.PhononPubKey, er
 	return s.cs.CreatePhonon(model.Secp256k1)
 }
 
-func (s *Session) CreatePhononSpecial(p *model.Phonon) (keyIndex uint16, pubkey model.PhononPubKey, err error) {
+func (s *Session) CreatePhononWithSetDescriptor(p *model.Phonon, privKey string) (keyIndex uint16, pubkey model.PhononPubKey, err error) {
 
 	if !s.verified() {
 		return 0, nil, card.ErrPINNotEntered
@@ -226,7 +226,7 @@ func (s *Session) CreatePhononSpecial(p *model.Phonon) (keyIndex uint16, pubkey 
 	s.ElementUsageMtex.Lock()
 	defer s.ElementUsageMtex.Unlock()
 
-	return s.cs.CreatePhononSpecial(model.Secp256k1, p)
+	return s.cs.CreatePhononWithSetDescriptor(model.Secp256k1, p, privKey)
 }
 
 func (s *Session) SetDescriptor(p *model.Phonon) error {
@@ -420,7 +420,7 @@ func (s *Session) SendFlexPhonon(keyIndexSender uint16, value uint64) (err error
 	if err != nil {
 			return err
 	}
-	sendTagPubKey, err := sendCollection.FindTag(model.SourcePublicKey)
+	sendTagPubKey, err := sendCollection.FindTag(model.TagCreatorPublicKey)
 	if err != nil {
 			return err
 	}
@@ -501,7 +501,7 @@ func (s *Session) ResolveFlexPhonons(payload []byte) (returnLoad []byte, err err
 		if err != nil {
 				return nil, err
 		}
-		recvrTagPubKey, err := recvrCollection.FindTag(model.SourcePublicKey)
+		recvrTagPubKey, err := recvrCollection.FindTag(model.TagCreatorPublicKey)
 		if err != nil {
 				return nil, err
 		}
@@ -539,7 +539,7 @@ func (s *Session) ResolveFlexPhonons(payload []byte) (returnLoad []byte, err err
 	return returnLoad, nil
 }
 
-func (s *Session) FindFlexPhonon(sourcePublicKeyBytes []byte) (returnLoad bool, err error) {
+func (s *Session) FindFlexPhonon(TagCreatorPublicKeyBytes []byte) (returnLoad bool, err error) {
 	log.Debug("sending FIND_FLEX_PHONON")
 
 	var setCurrencyType model.CurrencyType = 4
@@ -555,13 +555,13 @@ func (s *Session) FindFlexPhonon(sourcePublicKeyBytes []byte) (returnLoad bool, 
 		if err != nil {
 				return false, err
 		}
-		recvrTagPubKey, err := recvrCollection.FindTag(model.SourcePublicKey)
+		recvrTagPubKey, err := recvrCollection.FindTag(model.TagCreatorPublicKey)
 		if err != nil {
 				return false, err
 		}
 
 		// check for matching source pub key
-		if (string(sourcePublicKeyBytes) == string(recvrTagPubKey)) {
+		if (string(TagCreatorPublicKeyBytes) == string(recvrTagPubKey)) {
 			log.Debug("found eligible phonon with source pubkey match")
 			returnLoad = true
 		}

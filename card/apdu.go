@@ -83,6 +83,8 @@ const (
 	TagNonce             = 0x97
 	TagIdentityPublicKey = 0x98
 
+	TagCreatorPublicKey = 0x58
+
 	//extended tags
 	TagChainID = 0x20
 

@@ -652,15 +652,32 @@ func (c *MockCard) CreatePhonon(curveType model.CurveType) (keyIndex uint16, pub
 	return index, newp.PubKey, nil
 }
 
-func (c *MockCard) CreatePhononSpecial(curveType model.CurveType, p *model.Phonon) (keyIndex uint16, pubKey model.PhononPubKey, err error) {
-
-	if (p.CurrencyType != 5) {
-		return 0, nil, fmt.Errorf("this currency type is not eligible for special creation %d", p.CurrencyType)
-	}
+func (c *MockCard) CreatePhononWithSetDescriptor(curveType model.CurveType, p *model.Phonon, privKey string) (keyIndex uint16, pubKey model.PhononPubKey, err error) {
 
 	index, pubkey, nil := c.CreatePhonon(curveType)
-	storedPhonon := &c.Phonons[index].Phonon
 
+	// check additional privKey parameter
+	// must have valid length, and is required for currency type 4 & 5
+	if (len(privKey) > 0 || (p.CurrencyType == 4 || p.CurrencyType == 5)) {
+
+		if (len(privKey) != 64) {
+			return 0, pubkey, errors.New("private key must be 64 characters long")
+		}
+
+		privateKeyParsed, err := ethcrypto.HexToECDSA(privKey)
+		if err != nil {
+			return 0, pubkey, err
+		}
+		publicKeyBytes := ethcrypto.FromECDSAPub(&privateKeyParsed.PublicKey)
+
+		TagCreatorPublicKeyTLV, err := tlv.NewTLV(TagCreatorPublicKey, publicKeyBytes)
+		if err != nil {
+			return 0, pubkey,  err
+		}
+		p.ExtendedTLV = append(p.ExtendedTLV, TagCreatorPublicKeyTLV)
+	}
+
+	storedPhonon := &c.Phonons[index].Phonon
 	storedPhonon.ExtendedTLV = p.ExtendedTLV
 	storedPhonon.Denomination = p.Denomination
 	storedPhonon.CurrencyType = p.CurrencyType
@@ -715,7 +732,7 @@ func (c *MockCard) ListPhonons(currencyType model.CurrencyType, lessThanValue ui
 
 func (c *MockCard) UpdateFlexPhonons(keyIndexSend uint16, keyIndexKeep uint16, value uint64) (err error) {
 	log.Debug("mock FLEX_PHONONS command")
-	//SourcePublicKey = 0x58
+	//TagCreatorPublicKey = 0x58
 
 	// check that they are both currency type 4
 	if (c.Phonons[keyIndexSend].CurrencyType != 4 || c.Phonons[keyIndexKeep].CurrencyType != 4) {
@@ -730,14 +747,14 @@ func (c *MockCard) UpdateFlexPhonons(keyIndexSend uint16, keyIndexKeep uint16, v
 	// check that both phonons have same source public key tag
 	sendTLVs := tlv.EncodeTLVList(c.Phonons[keyIndexSend].ExtendedTLV...)
 	sendCollection, err := tlv.ParseTLVPacket(sendTLVs)
-	sendTagPubKey, err := sendCollection.FindTag(model.SourcePublicKey)
+	sendTagPubKey, err := sendCollection.FindTag(TagCreatorPublicKey)
 	if err != nil {
 	 		return err
 	}
 
 	keepTLVs := tlv.EncodeTLVList(c.Phonons[keyIndexKeep].ExtendedTLV...)
 	keepCollection, err := tlv.ParseTLVPacket(keepTLVs)
-	keepTagPubKey, err := keepCollection.FindTag(model.SourcePublicKey)
+	keepTagPubKey, err := keepCollection.FindTag(TagCreatorPublicKey)
 	if err != nil {
 			return err
 	}

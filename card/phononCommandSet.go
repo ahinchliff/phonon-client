@@ -478,7 +478,7 @@ func (cs *PhononCommandSet) CreatePhonon(curveType model.CurveType) (keyIndex ui
 	return keyIndex, pubKey, nil
 }
 
-func (cs *PhononCommandSet) CreatePhononSpecial(curveType model.CurveType, p *model.Phonon) (keyIndex uint16, pubKey model.PhononPubKey, err error) {
+func (cs *PhononCommandSet) CreatePhononWithSetDescriptor(curveType model.CurveType, p *model.Phonon, privKey string) (keyIndex uint16, pubKey model.PhononPubKey, err error) {
 	log.Debug("sending CREATE_PHONON_SPECIAL command")
 	log.Debug("CREATE PHONON SPECIAL ONLY AVAIALABLE FOR MOCK CARDS RIGHT NOW")
 
