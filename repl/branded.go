@@ -46,6 +46,9 @@ func createBrandedPhonon(c *ishell.Context, currencyType model.CurrencyType) {
     ExtendedTLV: extendedTLV,
   }
 
-  activeCard.CreatePhononWithSetDescriptor(p, sourcePrivKeyInput)
-
+  _, _, err = activeCard.CreatePhononWithSetDescriptor(p, sourcePrivKeyInput)
+  if err != nil {
+    c.Println("error creating branded phonon: ", err)
+    return
+  }
 }

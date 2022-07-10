@@ -22,21 +22,23 @@ func createPhonon(c *ishell.Context) {
 	c.Println("Public Key: ", pubKey)
 }
 
-func CreatePhononWithSetDescriptor(c *ishell.Context) {
+func createPhononSpecial(c *ishell.Context) {
 	if ready := checkActiveCard(c); !ready {
 		return
 	}
 
-	specialTypes := []string{"Branded"}
+	specialTypes := []string{"Branded", "Flexible"}
 
-	selection := c.MultiChoice(specialTypes, "please select an available card")
+	selection := c.MultiChoice(specialTypes, "select a special type to create:")
 
 	if selection == -1 {
 		c.Println("no special type selected")
 	} else if selection == 0 {
-
 		currencyType := model.CurrencyType(5)
 		createBrandedPhonon(c, currencyType)
+	} else if selection == 1 {
+		currencyType := model.CurrencyType(4)
+		createFlexiblePhonon(c, currencyType)
 	}
 
 }
@@ -126,7 +128,7 @@ func setDescriptor(c *ishell.Context) {
 		CurrencyType: currencyType,
 		Denomination: denomination,
 	}
-	
+
 	err = activeCard.SetDescriptor(p)
 	if err != nil {
 		c.Println("could not set descriptor: ", err)

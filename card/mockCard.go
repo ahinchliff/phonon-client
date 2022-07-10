@@ -654,29 +654,28 @@ func (c *MockCard) CreatePhonon(curveType model.CurveType) (keyIndex uint16, pub
 
 func (c *MockCard) CreatePhononWithSetDescriptor(curveType model.CurveType, p *model.Phonon, privKey string) (keyIndex uint16, pubKey model.PhononPubKey, err error) {
 
-	index, pubkey, nil := c.CreatePhonon(curveType)
-
 	// check additional privKey parameter
 	// must have valid length, and is required for currency type 4 & 5
-	if (len(privKey) > 0 || (p.CurrencyType == 4 || p.CurrencyType == 5)) {
-
+	if (len(privKey) > 0 || p.CurrencyType == 4 || p.CurrencyType == 5) {
 		if (len(privKey) != 64) {
-			return 0, pubkey, errors.New("private key must be 64 characters long")
+			return 0, nil, errors.New("private key must be 64 characters long")
 		}
 
 		privateKeyParsed, err := ethcrypto.HexToECDSA(privKey)
 		if err != nil {
-			return 0, pubkey, err
+			return 0, nil, err
 		}
 		publicKeyBytes := ethcrypto.FromECDSAPub(&privateKeyParsed.PublicKey)
 
 		TagCreatorPublicKeyTLV, err := tlv.NewTLV(TagCreatorPublicKey, publicKeyBytes)
 		if err != nil {
-			return 0, pubkey,  err
+			return 0, nil,  err
 		}
 		p.ExtendedTLV = append(p.ExtendedTLV, TagCreatorPublicKeyTLV)
 	}
 
+	// describe phonon
+	index, pubkey, nil := c.CreatePhonon(curveType)
 	storedPhonon := &c.Phonons[index].Phonon
 	storedPhonon.ExtendedTLV = p.ExtendedTLV
 	storedPhonon.Denomination = p.Denomination
@@ -684,7 +683,6 @@ func (c *MockCard) CreatePhononWithSetDescriptor(curveType model.CurveType, p *m
 
 	return index, pubkey, nil
 }
-
 
 func (c *MockCard) SetDescriptor(phonon *model.Phonon) error {
 

@@ -83,7 +83,7 @@ func Start() {
 	})
 	shell.AddCmd(&ishell.Cmd{
 		Name: "createSpecial",
-		Func: CreatePhononWithSetDescriptor,
+		Func: createPhononSpecial,
 		Help: "Create a new phonon key with special properties",
 	})
 	shell.AddCmd(&ishell.Cmd{
