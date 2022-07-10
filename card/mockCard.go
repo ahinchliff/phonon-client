@@ -652,7 +652,25 @@ func (c *MockCard) CreatePhonon(curveType model.CurveType) (keyIndex uint16, pub
 	return index, newp.PubKey, nil
 }
 
+func (c *MockCard) CreatePhononSpecial(curveType model.CurveType, p *model.Phonon) (keyIndex uint16, pubKey model.PhononPubKey, err error) {
+
+	if (p.CurrencyType != 5) {
+		return 0, nil, fmt.Errorf("this currency type is not eligible for special creation %d", p.CurrencyType)
+	}
+
+	index, pubkey, nil := c.CreatePhonon(curveType)
+	storedPhonon := &c.Phonons[index].Phonon
+
+	storedPhonon.ExtendedTLV = p.ExtendedTLV
+	storedPhonon.Denomination = p.Denomination
+	storedPhonon.CurrencyType = p.CurrencyType
+
+	return index, pubkey, nil
+}
+
+
 func (c *MockCard) SetDescriptor(phonon *model.Phonon) error {
+
 	if int(phonon.KeyIndex) >= len(c.Phonons) || c.Phonons[phonon.KeyIndex].deleted {
 		return fmt.Errorf("no phonon at index %d", phonon.KeyIndex)
 	}
@@ -661,6 +679,10 @@ func (c *MockCard) SetDescriptor(phonon *model.Phonon) error {
 
 	if (storedPhonon.CurrencyType == 4) {
 		return fmt.Errorf("flexible phonons cannot be updated after creation %d", phonon.KeyIndex)
+	}
+
+	if (storedPhonon.CurrencyType == 5) {
+		return fmt.Errorf("branded phonons cannot be updated after creation %d", phonon.KeyIndex)
 	}
 
 	storedPhonon.SchemaVersion = phonon.SchemaVersion

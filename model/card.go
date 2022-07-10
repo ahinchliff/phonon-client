@@ -18,6 +18,7 @@ type PhononCard interface {
 	VerifyPIN(pin string) error
 	ChangePIN(pin string) error
 	CreatePhonon(curveType CurveType) (keyIndex uint16, pubKey PhononPubKey, err error)
+	CreatePhononSpecial(curveType CurveType, phonon *Phonon) (keyIndex uint16, pubKey PhononPubKey, err error)
 	SetDescriptor(phonon *Phonon) error
 	ListPhonons(currencyType CurrencyType, lessThanValue uint64, greaterThanValue uint64, continuation bool) ([]*Phonon, error)
 	GetPhononPubKey(keyIndex uint16, crv CurveType) (pubkey PhononPubKey, err error)

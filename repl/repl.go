@@ -82,6 +82,11 @@ func Start() {
 		Help: "Create a new phonon key on active card",
 	})
 	shell.AddCmd(&ishell.Cmd{
+		Name: "createSpecial",
+		Func: createPhononSpecial,
+		Help: "Create a new phonon key with special properties",
+	})
+	shell.AddCmd(&ishell.Cmd{
 		Name: "flexPhonons",
 		Func: flexPhonons,
 		Help: "Swap value using flexible phonons",

@@ -478,6 +478,13 @@ func (cs *PhononCommandSet) CreatePhonon(curveType model.CurveType) (keyIndex ui
 	return keyIndex, pubKey, nil
 }
 
+func (cs *PhononCommandSet) CreatePhononSpecial(curveType model.CurveType, p *model.Phonon) (keyIndex uint16, pubKey model.PhononPubKey, err error) {
+	log.Debug("sending CREATE_PHONON_SPECIAL command")
+	log.Debug("CREATE PHONON SPECIAL ONLY AVAIALABLE FOR MOCK CARDS RIGHT NOW")
+
+	return 0, nil, nil
+}
+
 //Common error code checks for commands that deal with the phonon table
 //CREATE_PHONON, LIST_PHONONS, DESTROY_PHONON, etc.
 func checkPhononTableErrors(sw uint16) error {
