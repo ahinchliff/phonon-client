@@ -77,8 +77,18 @@ func sendFlex(c *ishell.Context) {
     c.Println("value could not be parse: ", err)
     return
   }
+  denomination, err := model.NewDenomination(big.NewInt(int64(value)))
+  if err != nil {
+    c.Println("value will not work with denomation: ", err)
+    return
+  }
 
-  err = activeCard.SendFlex(uint16(keyIndexSend), uint64(value))
+  // create new phonon to carry value denomination
+  p := &model.Phonon{
+    Denomination: denomination,
+  }
+
+  err = activeCard.SendFlex(uint16(keyIndexSend), p)
   if err != nil {
     c.Println("error during flex phonons: ", err)
     return
@@ -86,6 +96,7 @@ func sendFlex(c *ishell.Context) {
 }
 
 func consolidateFlex(c *ishell.Context) {
+  c.Println("initiating consolidate flex")
   numCorrectArgs := 2
 	if len(c.Args) != numCorrectArgs {
 		c.Printf("consolidateFlex requires %v args\n", numCorrectArgs)

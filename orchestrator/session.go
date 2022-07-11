@@ -371,7 +371,7 @@ func (s *Session) PostPhonons(pubkey []byte, nonce uint64, keyIndices []uint16) 
 	return transferPhononPackets, nil
 }
 
-func (s *Session) SendFlex(keyIndexKeep uint16, value uint64) (err error) {
+func (s *Session) SendFlex(keyIndexKeep uint16, value *model.Phonon) (err error) {
 	log.Debug("initiating orchestrator Flexing phonons")
 
 	// Initiated by Sending Party
@@ -438,6 +438,7 @@ func (s *Session) SendFlex(keyIndexKeep uint16, value uint64) (err error) {
 }
 
 func (s *Session) ConsolidateFlex(keyIndexKeep uint16, keyIndexDestroy uint16) (err error) {
+	fmt.Println("initiating orchestratoy CONSOLIDATE FLEX")
 	if !s.verified() {
 		return card.ErrPINNotEntered
 	}
@@ -463,24 +464,16 @@ func (s *Session) ConsolidateFlex(keyIndexKeep uint16, keyIndexDestroy uint16) (
 		return errors.New("could not find flexible phonon")
 	}
 
-	fmt.Println(phononsKey)
-	// TO DO: Still work in progress. Need to get the value from the destroying
-	// phonon.  Thinking it may be easier having the UpdateFlexPhonons take
-	// big int instead of uint64 because not sure how stable converting from
-	// big int to uint64 would be here.
-
-	/*
-	// check keeping phonon has enough value
-	if (phonons[phononsKey].Denomination.Value().Cmp(new(big.Int).SetUint64(value)) == -1) {
-			return errors.New("sending phonon does not have enough value to flex")
+	// create new phonon to carry value denomination
+	p := &model.Phonon{
+		Denomination: phonons[phononsKey].Denomination,
 	}
 
 	// flex value between phonons
-	err = s.cs.UpdateFlexPhonons(keyIndexKeep, keyIndexDestroy, value)
+	err = s.cs.UpdateFlexPhonons(keyIndexDestroy, keyIndexKeep, p)
 	if err != nil {
 		return err
 	}
-	*/
 
 	return nil
 }

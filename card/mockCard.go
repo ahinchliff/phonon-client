@@ -744,8 +744,8 @@ func (c *MockCard) ListPhonons(currencyType model.CurrencyType, lessThanValue ui
 	return ret, nil
 }
 
-func (c *MockCard) UpdateFlexPhonons(keyIndexKeep uint16, keyIndexSend uint16, value uint64) (err error) {
-	log.Debug("mock FLEX_PHONONS command")
+func (c *MockCard) UpdateFlexPhonons(keyIndexKeep uint16, keyIndexSend uint16, value *model.Phonon) (err error) {
+	log.Debug("mock UPDATE_FLEX_PHONONS command")
 
 	// check that they are both currency type 4
 	if (c.Phonons[keyIndexKeep].CurrencyType != 4 || c.Phonons[keyIndexSend].CurrencyType != 4) {
@@ -777,17 +777,17 @@ func (c *MockCard) UpdateFlexPhonons(keyIndexKeep uint16, keyIndexSend uint16, v
 	}
 
 	// check that value is greater than 0
-	if (value <= 0) {
-		return errors.New("flex value must be positive")
+	if (value.Denomination.Value().Cmp(new(big.Int).SetUint64(0)) == -1) {
+			return errors.New("flex value must be positive")
 	}
 
 	// check that keeping phonon has enough value
-	if (c.Phonons[keyIndexKeep].Denomination.Value().Cmp(new(big.Int).SetUint64(value)) == -1) {
+	if (c.Phonons[keyIndexKeep].Denomination.Value().Cmp(value.Denomination.Value()) == -1) {
 			return errors.New("sending phonon does not have enough value to flex")
 	}
 
 	// decrement send
-	newSendBalance := big.NewInt(0).Sub(c.Phonons[keyIndexKeep].Denomination.Value(), new(big.Int).SetUint64(value))
+	newSendBalance := big.NewInt(0).Sub(c.Phonons[keyIndexKeep].Denomination.Value(), value.Denomination.Value())
 	newSendDenomination, err := model.NewDenomination(newSendBalance)
 	if err != nil {
 		log.Debug("could not denominate the new balance for sending flex phonon")
@@ -796,7 +796,7 @@ func (c *MockCard) UpdateFlexPhonons(keyIndexKeep uint16, keyIndexSend uint16, v
 	c.Phonons[keyIndexKeep].Denomination = newSendDenomination
 
 	// increment keep
-	newKeepBalance := big.NewInt(0).Add(c.Phonons[keyIndexSend].Denomination.Value(), new(big.Int).SetUint64(value))
+	newKeepBalance := big.NewInt(0).Add(c.Phonons[keyIndexSend].Denomination.Value(), value.Denomination.Value())
 	newKeepDenomination, err := model.NewDenomination(newKeepBalance)
 	if err != nil {
 		log.Debug("could not denominate the new balance for keeping flex phonon")

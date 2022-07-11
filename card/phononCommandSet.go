@@ -702,7 +702,7 @@ func (cs *PhononCommandSet) PostPhonons(recipientsPublicKey []byte, nonce uint64
 	return nil ,nil
 }
 
-func (cs *PhononCommandSet) UpdateFlexPhonons(keyIndexSend uint16, keyIndexKeep uint16, value uint64) (err error) {
+func (cs *PhononCommandSet) UpdateFlexPhonons(keyIndexSend uint16, keyIndexKeep uint16, value *model.Phonon) (err error) {
 	log.Debug("sending FLEX_PHONONS command")
 	log.Debug("FLEX PHONONS ONLY AVAIALABLE FOR MOCK CARDS RIGHT NOW")
 	return nil
