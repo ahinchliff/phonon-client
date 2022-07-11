@@ -92,34 +92,6 @@ type ResponseReceivePhonons struct {
 	Err error
 }
 
-type RequestFindFlexPhonon struct {
-	Ret     chan ResponseFindFlexPhonon
-	Payload []byte
-}
-
-func (*RequestFindFlexPhonon) GetName() string {
-	return "RequestReceivePhonons"
-}
-
-type ResponseFindFlexPhonon struct {
-	Returnload bool
-	Err error
-}
-
-type RequestFlexPhonons struct {
-	Ret     chan ResponseFlexPhonons
-	Payload []byte
-}
-
-func (*RequestFlexPhonons) GetName() string {
-	return "RequestFlexPhonons"
-}
-
-type ResponseFlexPhonons struct {
-	Returnload []byte
-	Err error
-}
-
 type RequestGetName struct {
 	Ret chan ResponseGetName
 }

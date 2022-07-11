@@ -12,7 +12,6 @@ import (
 	"github.com/GridPlus/phonon-client/cert"
 	"github.com/GridPlus/phonon-client/chain"
 	"github.com/GridPlus/phonon-client/model"
-	"github.com/GridPlus/phonon-client/tlv"
 	remote "github.com/GridPlus/phonon-client/remote/v1/client"
 	"github.com/GridPlus/phonon-client/util"
 
@@ -442,107 +441,6 @@ func (s *Session) SendFlex(keyIndexKeep uint16, value uint64) (err error) {
 	return nil
 }
 
-func (s *Session) ResolveFlexPhonons(payload []byte) (returnLoad []byte, err error) {
-	log.Debug("sending BALANCE_PHONONS")
-
-	if !s.verified() && s.RemoteCard != nil {
-		return nil, ErrCardNotPairedToCard
-	}
-	s.ElementUsageMtex.Lock()
-	defer s.ElementUsageMtex.Unlock()
-
-	// receiving party parses payload
-	var sendPhononPublicKey = payload[:65]
-	var sendTagPubKey = payload[65:130]
-	var valueBytes = payload[130:138]
-	var phononTransferPacket = payload[138:len(payload)]
-
-	// receiving party gets senders phonon
-	err = s.cs.ReceivePhonons(phononTransferPacket)
-
-	var setCurrencyType model.CurrencyType = 4
-	var lessThanValue uint64
-	var greaterThanValue uint64
-
-	var keepKeyIndex uint16
-	var sendKeyIndex uint16
-
-	// receiving party identifies relevant phonons
-	receiversPhonons, err := s.cs.ListPhonons(setCurrencyType, lessThanValue, greaterThanValue, false)
-	for _, phonon := range receiversPhonons {
-		recvrTLVs := tlv.EncodeTLVList(phonon.ExtendedTLV...)
-		recvrCollection, err := tlv.ParseTLVPacket(recvrTLVs)
-		if err != nil {
-				return nil, err
-		}
-		recvrTagPubKey, err := recvrCollection.FindTag(model.TagCreatorPublicKey)
-		if err != nil {
-				return nil, err
-		}
-
-		// phonon has matching source pub key
-		if (string(sendTagPubKey) == string(recvrTagPubKey)) {
-			if (string(phonon.PubKey.Bytes()) == string(sendPhononPublicKey)) {
-				// this phonon must be sent back to sender
-				sendKeyIndex = phonon.KeyIndex
-			} else {
-				keepKeyIndex = phonon.KeyIndex
-			}
-		}
-	}
-
-	// receiving party updates identified flexible phonons
-	value, err := util.BytesToUint64(valueBytes)
-	if err != nil {
-		return nil, err
-	}
-	err = s.cs.UpdateFlexPhonons(sendKeyIndex, keepKeyIndex, value)
-	if err != nil {
-		return nil, err
-	}
-
-
-	// receiving party returns the senders flexible phonon
-	var keyIndices []uint16
-	keyIndices = append(keyIndices, sendKeyIndex)
-	returnLoad, err = s.cs.SendPhonons(keyIndices, false)
-	if err != nil {
-		return nil, err
-	}
-
-	return returnLoad, nil
-}
-
-func (s *Session) FindFlexPhonon(TagCreatorPublicKeyBytes []byte) (returnLoad bool, err error) {
-	log.Debug("sending FIND_FLEX_PHONON")
-
-	var setCurrencyType model.CurrencyType = 4
-	var lessThanValue uint64
-	var greaterThanValue uint64
-
-	// look for phonon with matching source public key in tlv
-	returnLoad = false
-	receiversPhonons, err := s.cs.ListPhonons(setCurrencyType, lessThanValue, greaterThanValue, false)
-	for _, phonon := range receiversPhonons {
-		recvrTLVs := tlv.EncodeTLVList(phonon.ExtendedTLV...)
-		recvrCollection, err := tlv.ParseTLVPacket(recvrTLVs)
-		if err != nil {
-				return false, err
-		}
-		recvrTagPubKey, err := recvrCollection.FindTag(model.TagCreatorPublicKey)
-		if err != nil {
-				return false, err
-		}
-
-		// check for matching source pub key
-		if (string(TagCreatorPublicKeyBytes) == string(recvrTagPubKey)) {
-			log.Debug("found eligible phonon with source pubkey match")
-			returnLoad = true
-		}
-	}
-	return returnLoad, nil
-}
-
 func (s *Session) ReceivePostedPhonons(postedPacket []byte) (err error) {
 	log.Debug("sending orchestrator RECEIVE_POSTED_PHONONS for mock card")
 
@@ -788,26 +686,6 @@ func (s *Session) handleRequest(r model.SessionRequest) {
 		}
 		var resp model.ResponseReceivePhonons
 		resp.Err = s.ReceivePhonons(req.Payload)
-		req.Ret <- resp
-	case "RequestFlexPhonons":
-		req, ok := r.(*model.RequestFlexPhonons)
-		if !ok {
-			panic("this shouldn't happen.")
-		}
-		var resp model.ResponseFlexPhonons
-		returnLoad, err := s.ResolveFlexPhonons(req.Payload)
-		resp.Returnload = returnLoad
-		resp.Err = err
-		req.Ret <- resp
-	case "RequestFindFlexPhonon":
-		req, ok := r.(*model.RequestFindFlexPhonon)
-		if !ok {
-			panic("this shouldn't happen.")
-		}
-		var resp model.ResponseFindFlexPhonon
-		returnLoad, err := s.FindFlexPhonon(req.Payload)
-		resp.Returnload = returnLoad
-		resp.Err = err
 		req.Ret <- resp
 	case "RequestGetName":
 		req, ok := r.(*model.RequestGetName)
