@@ -3,6 +3,7 @@ package gui
 import (
 	"bytes"
 	"embed"
+	"encoding/asn1"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -16,9 +17,11 @@ import (
 
 	"github.com/GridPlus/phonon-client/model"
 	"github.com/GridPlus/phonon-client/orchestrator"
+	"github.com/GridPlus/phonon-client/util"
 	"github.com/getlantern/systray"
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -96,6 +99,8 @@ func Server(port string, certFile string, keyFile string, mock bool) {
 	r.HandleFunc("/listSessions", session.listSessions)
 	r.HandleFunc("/cards/{sessionID}/unlock", session.unlock)
 	r.HandleFunc("/cards/{sessionID}/pair", session.pair)
+	r.HandleFunc("/cards/{sessionID}/nonce", session.GetPostedPhononNonce)
+	r.HandleFunc("/cards/{sessionID}/identity/{nonce}", session.getIdentity)
 	// phonons
 	r.HandleFunc("/cards/{sessionID}/listPhonons", session.listPhonons)
 	r.HandleFunc("/cards/{sessionID}/phonon/{PhononIndex}/setDescriptor", session.setDescriptor)
@@ -405,6 +410,65 @@ func (apiSession apiSession) listSessions(w http.ResponseWriter, r *http.Request
 	enc.Encode(struct {
 		Sessions []string
 	}{Sessions: names})
+}
+
+func (apiSession apiSession) GetPostedPhononNonce(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	sess, err := apiSession.sessionFromMuxVars(vars)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	nonce, err := sess.GetPostedPhononNonce()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	enc := json.NewEncoder(w)
+	enc.Encode(struct {
+		Nonce uint64
+	}{Nonce: nonce})
+}
+
+func (apiSession apiSession) getIdentity(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+
+	sess, err := apiSession.sessionFromMuxVars(vars)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	nonce, ok := vars["nonce"]
+	if !ok {
+		fmt.Println("nonce not found")
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	nonceBytes := []byte(nonce)
+
+	publicKey, signature, err := sess.IdentifyCard(nonceBytes)
+	if err != nil {
+		fmt.Println("error identifying card")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	signatureBytes, err := asn1.Marshal(signature)
+	if err != nil {
+		fmt.Println("error converting signature to bytes")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	enc := json.NewEncoder(w)
+	enc.Encode(struct {
+		PublicKey string
+		Signature string
+	}{PublicKey: util.ECCPubKeyToHexString(publicKey), Signature: string(signatureBytes)})
 }
 
 func (apiSession apiSession) unlock(w http.ResponseWriter, r *http.Request) {

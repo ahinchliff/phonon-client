@@ -176,6 +176,55 @@ paths:
       type: string
       description: sessionID of connected card
 
+  /cards/{sessionID}/nonce:
+    get:
+      tags:
+        - 'sessions'
+      responses:
+        '404':
+          description: 'no session with id'
+        '200':
+          description: 'nonce'
+          schema:
+            type: 'object'
+            properties:
+              Nonce:
+                type: 'integer'
+    parameters:
+      - in: path
+        required: true
+        name: sessionID
+        type: string
+        description: sessionID of connected card
+
+  /cards/{sessionID}/identity/{nonce}:
+    get:
+      tags:
+        - 'sessions'
+      responses:
+        '404':
+          description: 'no session with id'
+        '200':
+          description: 'public key'
+          schema:
+            type: 'object'
+            properties:
+              PublicKey:
+                type: 'string'
+              Signature:
+                type: 'string'
+    parameters:
+      - in: path
+        required: true
+        name: sessionID
+        type: string
+        description: sessionID of connected card
+      - in: path
+        required: true
+        name: nonce
+        type: string
+        description: data for card to sign
+
   /cards/{sessionID}/phonon/{phononIndex}/setDescriptor:
     post:
       tags:
