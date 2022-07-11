@@ -463,6 +463,7 @@ func (s *Session) ConsolidateFlex(keyIndexKeep uint16, keyIndexDestroy uint16) (
 		return errors.New("could not find flexible phonon")
 	}
 
+	fmt.Println(phononsKey)
 	// TO DO: Still work in progress. Need to get the value from the destroying
 	// phonon.  Thinking it may be easier having the UpdateFlexPhonons take
 	// big int instead of uint64 because not sure how stable converting from
