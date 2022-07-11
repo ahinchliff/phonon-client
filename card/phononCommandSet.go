@@ -485,6 +485,15 @@ func (cs *PhononCommandSet) CreatePhononWithSetDescriptor(curveType model.CurveT
 	return 0, nil, nil
 }
 
+func (cs *PhononCommandSet) CreatePhononCopyDescriptorNoValue(curveType model.CurveType, p *model.Phonon) (keyIndex uint16, pubKey model.PhononPubKey, err error) {
+	log.Debug("sending CREATE_PHONON_COPY_DESCRIPTOR_NO_VALUE")
+	log.Debug("CREATE PHONON COPY DESCRIPTION NO VALUE ONLY AVAIALABLE FOR MOCK CARDS RIGHT NOW")
+
+	return 0, nil, nil
+}
+
+
+
 //Common error code checks for commands that deal with the phonon table
 //CREATE_PHONON, LIST_PHONONS, DESTROY_PHONON, etc.
 func checkPhononTableErrors(sw uint16) error {

@@ -22,14 +22,13 @@ func createFlexiblePhonon(c *ishell.Context, currencyType model.CurrencyType) {
   // 03a0b699905d81fed15c814725f0e09bd275921f4b0657b364e4a80183eb0ebb
   sourcePrivKeyInput := c.ReadLine()
 
-  // check priv key length
-  /*
+  // check priv key length (this is also checked on card)
   if (len(sourcePrivKeyInput) != 64) {
     c.Println("your private key must be 64 characters long")
     return
-  }*/
+  }
 
-  c.Println("What is the value of this branded phonon?")
+  c.Println("What is the value of this flexible phonon?")
   valueInput := c.ReadLine()
 
   value, err := strconv.ParseUint(valueInput, 10, 0)
@@ -54,8 +53,8 @@ func createFlexiblePhonon(c *ishell.Context, currencyType model.CurrencyType) {
   }
 }
 
-func flexPhonons(c *ishell.Context) {
-  log.Debug("initiating flexPhonons")
+func sendFlex(c *ishell.Context) {
+  log.Debug("initiating sendFlex")
 
   if ready := checkActiveCard(c); !ready {
 		return
@@ -79,7 +78,7 @@ func flexPhonons(c *ishell.Context) {
     return
   }
 
-  err = activeCard.SendFlexPhonon(uint16(keyIndexSend), uint64(value))
+  err = activeCard.SendFlex(uint16(keyIndexSend), uint64(value))
   if err != nil {
     c.Println("error during flex phonons: ", err)
     return

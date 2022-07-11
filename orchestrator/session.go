@@ -373,7 +373,7 @@ func (s *Session) PostPhonons(pubkey []byte, nonce uint64, keyIndices []uint16) 
 	return transferPhononPackets, nil
 }
 
-func (s *Session) SendFlexPhonon(keyIndexSender uint16, value uint64) (err error) {
+func (s *Session) SendFlex(keyIndexKeep uint16, value uint64) (err error) {
 	log.Debug("initiating orchestrator Flexing phonons")
 
 	// Initiated by Sending Party
@@ -382,11 +382,13 @@ func (s *Session) SendFlexPhonon(keyIndexSender uint16, value uint64) (err error
 	}
 
 	// Verify Pairing
+	log.Debug("verify pairing with card (note mock cards have a runtime error if remote card is null)")
 	err = s.RemoteCard.VerifyPaired()
 	if err != nil {
 		return err
 	}
 
+	log.Debug("verify value")
 	// check that value is greater than 0
 	if (value < 0) {
 		return errors.New("flex value must not be negative")
@@ -396,74 +398,46 @@ func (s *Session) SendFlexPhonon(keyIndexSender uint16, value uint64) (err error
 	var lessThanValue uint64
 	var greaterThanValue uint64
 
-	// check sending phonon
-	// TODO: see if you can access s.cs.Phonons[keyIndexSender]
-	sendingPhonons, err := s.cs.ListPhonons(setCurrencyType, lessThanValue, greaterThanValue, false)
+	// get keeping phonon
+	sendingPhonons, err := s.cs.ListPhonons(setCurrencyType, lessThanValue, greaterThanValue, true)
 
-	// check currency type
-	if (sendingPhonons[keyIndexSender].CurrencyType != 4) {
+	// check keeping phonon currency type
+	if (sendingPhonons[keyIndexKeep].CurrencyType != 4) {
 		return errors.New("only flex phonons may may flexed")
 	}
 
-	// check sending phonon has enough value
-	if (sendingPhonons[keyIndexSender].Denomination.Value().Cmp(new(big.Int).SetUint64(value)) == -1) {
+	// check keeping phonon has enough value
+	if (sendingPhonons[keyIndexKeep].Denomination.Value().Cmp(new(big.Int).SetUint64(value)) == -1) {
 			return errors.New("sending phonon does not have enough value to flex")
 	}
 
-	// get phonon public key for payload
-	sendPhononPublicKey := sendingPhonons[keyIndexSender].PubKey
-	log.Debug(sendPhononPublicKey)
-
-	// get source public key from phonon tag for payload
-	sendTLVs := tlv.EncodeTLVList(sendingPhonons[keyIndexSender].ExtendedTLV...)
-	sendCollection, err := tlv.ParseTLVPacket(sendTLVs)
+	// create phonon to send
+	keyIndexSend, _, err := s.cs.CreatePhononCopyDescriptorNoValue(model.Secp256k1, sendingPhonons[keyIndexKeep])
 	if err != nil {
-			return err
-	}
-	sendTagPubKey, err := sendCollection.FindTag(model.TagCreatorPublicKey)
-	if err != nil {
-			return err
-	}
-
-	// TODO: check if receiving card has phonon with same sendTagPubKey
-	hasPhononMatch, err := s.RemoteCard.FindFlexPhonon(sendTagPubKey)
-	if err != nil {
-		log.Debug("error looking for flex phonon on remote card")
 		return err
 	}
-	if (hasPhononMatch == false) {
-		return errors.New("remote card does not have a flexible phonon with matching source pubkey")
+
+	// flex value between phonons
+	err = s.cs.UpdateFlexPhonons(keyIndexKeep, keyIndexSend, value)
+	if err != nil {
+		return err
 	}
 
 	log.Debug("locking mutex")
 	s.ElementUsageMtex.Lock()
 	defer s.ElementUsageMtex.Unlock()
 
-
-	// sending party preps flexible phonon
 	var keyIndices []uint16
-	keyIndices = append(keyIndices,uint16(keyIndexSender))
+	keyIndices = append(keyIndices,uint16(keyIndexSend))
 	phononTransferPacket, err := s.cs.SendPhonons(keyIndices, false)
-	if err != nil {
-		return err
-	}
 
-	// sending party builds entire payload
-	var payload []byte
-	payload = append(payload, sendPhononPublicKey.Bytes()[:]...)
-	payload = append(payload, sendTagPubKey[:]...)
-	payload = append(payload, util.Uint64ToBytes(value)[:]...)
-	payload = append(payload, phononTransferPacket[:]...)
-
-	// receiving party receives and handles payload
-	returnLoad, err := s.RemoteCard.ReceiveFlexPhonons(payload)
+	fmt.Println("receiving flexible phonon")
+	err = s.RemoteCard.ReceivePhonons(phononTransferPacket)
 	if err != nil {
 		log.Debug("error receiving phonons on remote")
 		return err
 	}
-
-	// sending party gets their phonon back with updated value
-	err = s.cs.ReceivePhonons(returnLoad)
+	fmt.Println("unlockingMutex")
 
 	return nil
 }

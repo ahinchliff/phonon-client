@@ -684,7 +684,27 @@ func (c *MockCard) CreatePhononWithSetDescriptor(curveType model.CurveType, p *m
 	return index, pubkey, nil
 }
 
+func (c *MockCard) CreatePhononCopyDescriptorNoValue(curveType model.CurveType, p *model.Phonon) (keyIndex uint16, pubKey model.PhononPubKey, err error) {
+	// can we open this up to all phonon currency types?
+	if (p.CurrencyType != 4) {
+		return 0, nil, errors.New("only flexible phonons may be copied")
+	}
+
+	// copy tlv
+	index, pubkey, nil := c.CreatePhonon(curveType)
+	storedPhonon := &c.Phonons[index].Phonon
+	storedPhonon.ExtendedTLV = p.ExtendedTLV
+	storedPhonon.CurrencyType = p.CurrencyType
+
+	return index, pubkey, nil
+}
+
+
 func (c *MockCard) SetDescriptor(phonon *model.Phonon) error {
+
+	if (phonon.CurrencyType == 4 || phonon.CurrencyType == 5) {
+		return fmt.Errorf("set descriptor is disabled for this phonon type %d", phonon.KeyIndex)
+	}
 
 	if int(phonon.KeyIndex) >= len(c.Phonons) || c.Phonons[phonon.KeyIndex].deleted {
 		return fmt.Errorf("no phonon at index %d", phonon.KeyIndex)
@@ -692,12 +712,8 @@ func (c *MockCard) SetDescriptor(phonon *model.Phonon) error {
 
 	storedPhonon := &c.Phonons[phonon.KeyIndex].Phonon
 
-	if (storedPhonon.CurrencyType == 4) {
-		return fmt.Errorf("flexible phonons cannot be updated after creation %d", phonon.KeyIndex)
-	}
-
-	if (storedPhonon.CurrencyType == 5) {
-		return fmt.Errorf("branded phonons cannot be updated after creation %d", phonon.KeyIndex)
+	if (storedPhonon.CurrencyType == 4 || storedPhonon.CurrencyType == 5) {
+		return fmt.Errorf("this phonon cannot be updated after creation %d", phonon.KeyIndex)
 	}
 
 	storedPhonon.SchemaVersion = phonon.SchemaVersion
@@ -728,29 +744,29 @@ func (c *MockCard) ListPhonons(currencyType model.CurrencyType, lessThanValue ui
 	return ret, nil
 }
 
-func (c *MockCard) UpdateFlexPhonons(keyIndexSend uint16, keyIndexKeep uint16, value uint64) (err error) {
+func (c *MockCard) UpdateFlexPhonons(keyIndexKeep uint16, keyIndexSend uint16, value uint64) (err error) {
 	log.Debug("mock FLEX_PHONONS command")
 	//TagCreatorPublicKey = 0x58
 
 	// check that they are both currency type 4
-	if (c.Phonons[keyIndexSend].CurrencyType != 4 || c.Phonons[keyIndexKeep].CurrencyType != 4) {
+	if (c.Phonons[keyIndexKeep].CurrencyType != 4 || c.Phonons[keyIndexSend].CurrencyType != 4) {
 		return errors.New("only flexible phonons can flex")
 	}
 
 	// check that indices are different
-	if (keyIndexSend == keyIndexKeep) {
+	if (keyIndexKeep == keyIndexSend) {
 		return errors.New("flex phonons must be different")
 	}
 
 	// check that both phonons have same source public key tag
-	sendTLVs := tlv.EncodeTLVList(c.Phonons[keyIndexSend].ExtendedTLV...)
+	sendTLVs := tlv.EncodeTLVList(c.Phonons[keyIndexKeep].ExtendedTLV...)
 	sendCollection, err := tlv.ParseTLVPacket(sendTLVs)
 	sendTagPubKey, err := sendCollection.FindTag(TagCreatorPublicKey)
 	if err != nil {
 	 		return err
 	}
 
-	keepTLVs := tlv.EncodeTLVList(c.Phonons[keyIndexKeep].ExtendedTLV...)
+	keepTLVs := tlv.EncodeTLVList(c.Phonons[keyIndexSend].ExtendedTLV...)
 	keepCollection, err := tlv.ParseTLVPacket(keepTLVs)
 	keepTagPubKey, err := keepCollection.FindTag(TagCreatorPublicKey)
 	if err != nil {
@@ -766,28 +782,28 @@ func (c *MockCard) UpdateFlexPhonons(keyIndexSend uint16, keyIndexKeep uint16, v
 		return errors.New("flex value must be positive")
 	}
 
-	// check that sending phonon has enough value
-	if (c.Phonons[keyIndexSend].Denomination.Value().Cmp(new(big.Int).SetUint64(value)) == -1) {
+	// check that keeping phonon has enough value
+	if (c.Phonons[keyIndexKeep].Denomination.Value().Cmp(new(big.Int).SetUint64(value)) == -1) {
 			return errors.New("sending phonon does not have enough value to flex")
 	}
 
 	// decrement send
-	newSendBalance := big.NewInt(0).Sub(c.Phonons[keyIndexSend].Denomination.Value(), new(big.Int).SetUint64(value))
+	newSendBalance := big.NewInt(0).Sub(c.Phonons[keyIndexKeep].Denomination.Value(), new(big.Int).SetUint64(value))
 	newSendDenomination, err := model.NewDenomination(newSendBalance)
 	if err != nil {
 		log.Debug("could not denominate the new balance for sending flex phonon")
 		return err
 	}
-	c.Phonons[keyIndexSend].Denomination = newSendDenomination
+	c.Phonons[keyIndexKeep].Denomination = newSendDenomination
 
 	// increment keep
-	newKeepBalance := big.NewInt(0).Add(c.Phonons[keyIndexKeep].Denomination.Value(), new(big.Int).SetUint64(value))
+	newKeepBalance := big.NewInt(0).Add(c.Phonons[keyIndexSend].Denomination.Value(), new(big.Int).SetUint64(value))
 	newKeepDenomination, err := model.NewDenomination(newKeepBalance)
 	if err != nil {
 		log.Debug("could not denominate the new balance for keeping flex phonon")
 		return err
 	}
-	c.Phonons[keyIndexKeep].Denomination = newKeepDenomination
+	c.Phonons[keyIndexSend].Denomination = newKeepDenomination
 
 	return nil
 }

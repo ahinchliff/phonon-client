@@ -87,9 +87,9 @@ func Start() {
 		Help: "Create a new phonon key with special properties",
 	})
 	shell.AddCmd(&ishell.Cmd{
-		Name: "flexPhonons",
-		Func: flexPhonons,
-		Help: "Swap value using flexible phonons",
+		Name: "sendFlex",
+		Func: sendFlex,
+		Help: "Send value from a flexible phonon to another card",
 	})
 	shell.AddCmd(&ishell.Cmd{
 		Name: "setDescriptor",
