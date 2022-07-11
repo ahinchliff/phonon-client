@@ -84,3 +84,29 @@ func sendFlex(c *ishell.Context) {
     return
   }
 }
+
+func consolidateFlex(c *ishell.Context) {
+  numCorrectArgs := 2
+	if len(c.Args) != numCorrectArgs {
+		c.Printf("consolidateFlex requires %v args\n", numCorrectArgs)
+		return
+	}
+
+	keyIndexKeep, err := strconv.ParseUint(c.Args[0], 10, 16)
+	if err != nil {
+		c.Println("keyIndex could not be parsed: ", err)
+		return
+	}
+
+  keyIndexDestroy, err := strconv.ParseUint(c.Args[1], 10, 16)
+	if err != nil {
+		c.Println("keyIndex could not be parsed: ", err)
+		return
+	}
+
+  err = activeCard.ConsolidateFlex(uint16(keyIndexKeep), uint16(keyIndexDestroy))
+  if err != nil {
+    c.Println("error during consolidate fleixible phonon: ", err)
+    return
+  }
+}

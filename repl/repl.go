@@ -71,6 +71,13 @@ func Start() {
 		Help: "Change the active card's PIN",
 	})
 	shell.AddCmd(&ishell.Cmd{
+		Name: "consolidateFlex",
+		Func: consolidateFlex,
+		Help: `Combine the value between two sibling Flexible phonons.
+					 The first will be filled. The second destroyed. 
+					 Args: [keyIndex] [keyIndex]`,
+	})
+	shell.AddCmd(&ishell.Cmd{
 		Name: "list",
 		Func: listPhonons,
 		Help: `List phonons on card. Optionally takes arguments to filter by.

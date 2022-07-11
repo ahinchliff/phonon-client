@@ -746,7 +746,6 @@ func (c *MockCard) ListPhonons(currencyType model.CurrencyType, lessThanValue ui
 
 func (c *MockCard) UpdateFlexPhonons(keyIndexKeep uint16, keyIndexSend uint16, value uint64) (err error) {
 	log.Debug("mock FLEX_PHONONS command")
-	//TagCreatorPublicKey = 0x58
 
 	// check that they are both currency type 4
 	if (c.Phonons[keyIndexKeep].CurrencyType != 4 || c.Phonons[keyIndexSend].CurrencyType != 4) {

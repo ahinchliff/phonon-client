@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/url"
 	"sync"
-	"math/big"
 
 	"github.com/GridPlus/phonon-client/card"
 	"github.com/GridPlus/phonon-client/cert"
@@ -387,31 +386,28 @@ func (s *Session) SendFlex(keyIndexKeep uint16, value uint64) (err error) {
 		return err
 	}
 
-	log.Debug("verify value")
-	// check that value is greater than 0
-	if (value < 0) {
-		return errors.New("flex value must not be negative")
-	}
-
+	// get description data about phonon to keep
 	var setCurrencyType model.CurrencyType = 4
 	var lessThanValue uint64
 	var greaterThanValue uint64
 
-	// get keeping phonon
-	sendingPhonons, err := s.cs.ListPhonons(setCurrencyType, lessThanValue, greaterThanValue, true)
-
-	// check keeping phonon currency type
-	if (sendingPhonons[keyIndexKeep].CurrencyType != 4) {
-		return errors.New("only flex phonons may may flexed")
+	phonons, err := s.cs.ListPhonons(setCurrencyType, lessThanValue, greaterThanValue, false)
+	var phononsKey uint16
+	var phononsKeyCheck bool = false
+	for i, sendingPhonon := range phonons {
+		if (sendingPhonon.KeyIndex == keyIndexKeep) {
+			phononsKey = uint16(i)
+			phononsKeyCheck = true
+		}
+	}
+	if phononsKeyCheck == false {
+		return errors.New("could not find flexible phonon")
 	}
 
-	// check keeping phonon has enough value
-	if (sendingPhonons[keyIndexKeep].Denomination.Value().Cmp(new(big.Int).SetUint64(value)) == -1) {
-			return errors.New("sending phonon does not have enough value to flex")
-	}
-
-	// create phonon to send
-	keyIndexSend, _, err := s.cs.CreatePhononCopyDescriptorNoValue(model.Secp256k1, sendingPhonons[keyIndexKeep])
+	// create phonon to send based on keeping phonon
+	// TODO: confirm that adding a new phonon does NOT alter the indices for
+	// existing phonons; is keyIndexKeep stable?
+	keyIndexSend, _, err := s.cs.CreatePhononCopyDescriptorNoValue(model.Secp256k1, phonons[phononsKey])
 	if err != nil {
 		return err
 	}
@@ -437,6 +433,53 @@ func (s *Session) SendFlex(keyIndexKeep uint16, value uint64) (err error) {
 		return err
 	}
 	fmt.Println("unlockingMutex")
+
+	return nil
+}
+
+func (s *Session) ConsolidateFlex(keyIndexKeep uint16, keyIndexDestroy uint16) (err error) {
+	if !s.verified() {
+		return card.ErrPINNotEntered
+	}
+	s.ElementUsageMtex.Lock()
+	defer s.ElementUsageMtex.Unlock()
+
+
+	// get value from phonon to destroy
+	var setCurrencyType model.CurrencyType = 4
+	var lessThanValue uint64
+	var greaterThanValue uint64
+
+	phonons, err := s.cs.ListPhonons(setCurrencyType, lessThanValue, greaterThanValue, false)
+	var phononsKey uint16
+	var phononsKeyCheck bool = false
+	for i, sendingPhonon := range phonons {
+		if (sendingPhonon.KeyIndex == keyIndexDestroy) {
+			phononsKey = uint16(i)
+			phononsKeyCheck = true
+		}
+	}
+	if phononsKeyCheck == false {
+		return errors.New("could not find flexible phonon")
+	}
+
+	// TO DO: Still work in progress. Need to get the value from the destroying
+	// phonon.  Thinking it may be easier having the UpdateFlexPhonons take
+	// big int instead of uint64 because not sure how stable converting from
+	// big int to uint64 would be here.
+
+	/*
+	// check keeping phonon has enough value
+	if (phonons[phononsKey].Denomination.Value().Cmp(new(big.Int).SetUint64(value)) == -1) {
+			return errors.New("sending phonon does not have enough value to flex")
+	}
+
+	// flex value between phonons
+	err = s.cs.UpdateFlexPhonons(keyIndexKeep, keyIndexDestroy, value)
+	if err != nil {
+		return err
+	}
+	*/
 
 	return nil
 }
