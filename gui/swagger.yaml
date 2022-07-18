@@ -353,6 +353,8 @@ paths:
               type: 'string'
             Nonce:
               type: 'number'
+            IsPrivate:
+              type: 'boolean'
   /cards/{sessionID}/phonon/create:
     post:
       tags:

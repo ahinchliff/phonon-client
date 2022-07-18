@@ -678,13 +678,13 @@ func (cs *PhononCommandSet) SendPhonons(keyIndices []uint16, extendedRequest boo
 	return transferPhononPackets, nil
 }
 
-func (cs *PhononCommandSet) PostPhonons(recipientsPublicKey []byte, nonce uint64, keyIndices []uint16) (transferPhononPackets []byte, err error){
+func (cs *PhononCommandSet) PostPhonons(isPrivate bool, recipientsPublicKey []byte, nonce uint64, keyIndices []uint16) (transferPhononPackets []byte, err error) {
 	log.Debug("sending POST_PHONONS command")
 	log.Debug("POST PHONONS ONLY AVAIALABLE FOR MOCK CARDS RIGHT NOW")
-	return nil ,nil
+	return nil, nil
 }
 
-func (cs *PhononCommandSet) ReceivePostedPhonons(postedPacket []byte) (err error){
+func (cs *PhononCommandSet) ReceivePostedPhonons(postedPacket []byte) (err error) {
 	log.Debug("sending RECEIVE_POSTED_PHONONS command")
 	log.Debug("RECEIVE POSTED PHONONS ONLY AVAIALABLE FOR MOCK CARDS RIGHT NOW")
 	return nil

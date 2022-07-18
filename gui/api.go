@@ -800,6 +800,7 @@ func (apiSession apiSession) postPhonon(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	body := struct {
+		IsPrivate           bool
 		Nonce               int64
 		RecipientsPublicKey string
 	}{}
@@ -810,15 +811,15 @@ func (apiSession apiSession) postPhonon(w http.ResponseWriter, r *http.Request) 
 	}
 
 	recipientsPublicKeyBytes, err := hex.DecodeString(body.RecipientsPublicKey)
-	// remove all this x nonsense
 	receivingCardPubKey, err := util.ParseECCPubKey(recipientsPublicKeyBytes)
+	// todo - remove all this x nonsense
 	receivingCardPubKeyXbytes := receivingCardPubKey.X.Bytes()
 	if err != nil {
 		http.Error(w, "unable to post phonons: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	packet, err := sess.PostPhonons(receivingCardPubKeyXbytes, uint64(body.Nonce), []uint16{uint16(index)})
+	packet, err := sess.PostPhonons(body.IsPrivate, receivingCardPubKeyXbytes, uint64(body.Nonce), []uint16{uint16(index)})
 	if err != nil {
 		http.Error(w, "unable to post phonons: "+err.Error(), http.StatusInternalServerError)
 		return

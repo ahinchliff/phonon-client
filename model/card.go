@@ -23,7 +23,7 @@ type PhononCard interface {
 	GetPhononPubKey(keyIndex uint16, crv CurveType) (pubkey PhononPubKey, err error)
 	DestroyPhonon(keyIndex uint16) (privKey *ecdsa.PrivateKey, err error)
 	SendPhonons(keyIndices []uint16, extendedRequest bool) (transferPhononPackets []byte, err error)
-	PostPhonons(pubkey []byte, nonce uint64, keyIndices []uint16) (transferPhononPackets []byte, err error)
+	PostPhonons(isPrivate bool, pubkey []byte, nonce uint64, keyIndices []uint16) (transferPhononPackets []byte, err error)
 	ReceivePostedPhonons(postedPacket []byte) (err error)
 	ReceivePhonons(phononTransfer []byte) error
 	SetReceiveList(phononPubKeys []*ecdsa.PublicKey) error

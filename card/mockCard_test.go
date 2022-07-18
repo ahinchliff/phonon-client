@@ -43,11 +43,13 @@ func TestPostedPhononFlow(t *testing.T) {
 	senderCard, err := NewMockCard(true, false)
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
 	recipientCard, err := NewMockCard(true, false)
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
 	senderCard.VerifyPIN("111111")
@@ -57,28 +59,82 @@ func TestPostedPhononFlow(t *testing.T) {
 
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
 	// todo - work out correct way to pass in recipients public key
-	transaction, err := senderCard.PostPhonons(recipientCard.IdentityPubKey.X.Bytes(), 1, []uint16{0})
+	transaction, err := senderCard.PostPhonons(false, recipientCard.IdentityPubKey.X.Bytes(), 1, []uint16{0})
 
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
 	err = recipientCard.ReceivePostedPhonons(transaction)
 
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
 	receivedPhononPubKey, err := recipientCard.GetPhononPubKey(0, model.Secp256k1)
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
 	if !createdPhononPubKey.Equal(receivedPhononPubKey) {
 		t.Error("Created and received phonon pub keys do not match", createdPhononPubKey, receivedPhononPubKey)
+		return
+	}
+}
+
+func TestPrivatePostedPhononFlow(t *testing.T) {
+	senderCard, err := NewMockCard(true, false)
+	if err != nil {
+		t.Error(err)
+		return
 	}
 
+	recipientCard, err := NewMockCard(true, false)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	senderCard.VerifyPIN("111111")
+	recipientCard.VerifyPIN("111111")
+
+	_, createdPhononPubKey, err := senderCard.CreatePhonon(model.Secp256k1)
+
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	// todo - work out correct way to pass in recipients public key
+	transaction, err := senderCard.PostPhonons(true, recipientCard.IdentityPubKey.X.Bytes(), 1, []uint16{0})
+
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	err = recipientCard.ReceivePostedPhonons(transaction)
+
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	receivedPhononPubKey, err := recipientCard.GetPhononPubKey(0, model.Secp256k1)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	if !createdPhononPubKey.Equal(receivedPhononPubKey) {
+		t.Error("Created and received phonon pub keys do not match", createdPhononPubKey, receivedPhononPubKey)
+		return
+	}
 }
