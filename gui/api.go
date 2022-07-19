@@ -2,7 +2,9 @@ package gui
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -16,14 +18,15 @@ import (
 
 	"github.com/GridPlus/phonon-client/model"
 	"github.com/GridPlus/phonon-client/orchestrator"
+	"github.com/GridPlus/phonon-client/util"
 	"github.com/getlantern/systray"
 	"github.com/gorilla/mux"
 	"github.com/pkg/browser"
 	"github.com/rs/cors"
+
 	log "github.com/sirupsen/logrus"
 )
 
-//go:embed frontend/build/*
 var frontend embed.FS
 
 //go:embed swagger.yaml
@@ -45,6 +48,11 @@ type apiSession struct {
 type sessionCache struct {
 	cachePopulated bool
 	phonons        map[uint16]*model.Phonon
+}
+
+type Signature struct {
+	R string
+	S string
 }
 
 var cache map[string]*sessionCache
@@ -99,10 +107,14 @@ func Server(port string, certFile string, keyFile string, mock bool) {
 	r.HandleFunc("/cards/{sessionID}/init", session.init)
 	r.HandleFunc("/cards/{sessionID}/unlock", session.unlock)
 	r.HandleFunc("/cards/{sessionID}/pair", session.pair)
+	r.HandleFunc("/cards/{sessionID}/nonce", session.GetPostedPhononNonce)
+	r.HandleFunc("/cards/{sessionID}/identity/{nonce}", session.getIdentity)
 	// phonons
 	r.HandleFunc("/cards/{sessionID}/listPhonons", session.listPhonons)
+	r.HandleFunc("/cards/{sessionID}/consumePosted", session.consumePosted)
 	r.HandleFunc("/cards/{sessionID}/phonon/{PhononIndex}/setDescriptor", session.setDescriptor)
 	r.HandleFunc("/cards/{sessionID}/phonon/{PhononIndex}/send", session.send)
+	r.HandleFunc("/cards/{sessionID}/phonon/{PhononIndex}/post", session.postPhonon)
 	r.HandleFunc("/cards/{sessionID}/phonon/create", session.createPhonon)
 	r.HandleFunc("/cards/{sessionID}/phonon/redeem", session.redeemPhonons)
 	r.HandleFunc("/cards/{sessionID}/phonon/{PhononIndex}/export", session.exportPhonon)
@@ -466,6 +478,61 @@ func (apiSession apiSession) init(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (apiSession apiSession) GetPostedPhononNonce(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	sess, err := apiSession.sessionFromMuxVars(vars)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	nonce, err := sess.GetPostedPhononNonce()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	enc := json.NewEncoder(w)
+	enc.Encode(struct {
+		Nonce uint64
+	}{Nonce: nonce})
+}
+
+func (apiSession apiSession) getIdentity(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+
+	sess, err := apiSession.sessionFromMuxVars(vars)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	nonce, ok := vars["nonce"]
+	if !ok {
+		fmt.Println("nonce not found")
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	nonceHash := sha256.Sum256([]byte(nonce))
+
+	publicKey, signature, err := sess.IdentifyCard(nonceHash[:])
+	if err != nil {
+		fmt.Println("error identifying card")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	enc := json.NewEncoder(w)
+	enc.Encode(struct {
+		PublicKey string
+		Signature Signature
+	}{PublicKey: util.ECCPubKeyToHexString(publicKey), Signature: Signature{
+		R: signature.R.String(),
+		S: signature.S.String(),
+	}})
+}
+
 func (apiSession apiSession) unlock(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	sess, err := apiSession.sessionFromMuxVars(vars)
@@ -707,6 +774,103 @@ func (apiSession apiSession) send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	delete(cache[sess.GetName()].phonons, uint16(index))
+}
+
+func (apiSession apiSession) postPhonon(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	sess, err := apiSession.sessionFromMuxVars(vars)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	phononIndex, ok := vars["PhononIndex"]
+	if !ok {
+		http.Error(w, "Phonon not found", http.StatusNotFound)
+		return
+	}
+	index, err := strconv.ParseUint(phononIndex, 10, 16)
+	if err != nil {
+		http.Error(w, "Unable to convert index to int:"+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	rawBody, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Unable to read body", http.StatusBadRequest)
+		return
+	}
+	body := struct {
+		Nonce               int64
+		RecipientsPublicKey string
+	}{}
+	err = json.Unmarshal(rawBody, &body)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
+	recipientsPublicKeyBytes, err := hex.DecodeString(body.RecipientsPublicKey)
+	receivingCardPubKey, err := util.ParseECCPubKey(recipientsPublicKeyBytes)
+	if err != nil {
+		http.Error(w, "unable to post phonons: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	packet, err := sess.PostPhonons(receivingCardPubKey, uint64(body.Nonce), []uint16{uint16(index)})
+	if err != nil {
+		http.Error(w, "unable to post phonons: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	enc := json.NewEncoder(w)
+
+	enc.Encode(struct {
+		Packet string
+	}{Packet: hex.EncodeToString(packet)})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	delete(cache[sess.GetName()].phonons, uint16(index))
+}
+
+func (apiSession apiSession) consumePosted(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	sess, err := apiSession.sessionFromMuxVars(vars)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	rawBody, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Unable to read body", http.StatusBadRequest)
+		return
+	}
+	body := struct {
+		Packet string
+	}{}
+	err = json.Unmarshal(rawBody, &body)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
+	packet, err := hex.DecodeString(body.Packet)
+	if err != nil {
+		http.Error(w, "Unable to redeem phonon: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	err = sess.ReceivePostedPhonons(packet)
+	if err != nil {
+		http.Error(w, "unable to post phonons: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	cache[sess.GetName()].cachePopulated = false
+
 }
 
 func (apiSession apiSession) exportPhonon(w http.ResponseWriter, r *http.Request) {

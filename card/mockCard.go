@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/sha512"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math/big"
@@ -42,6 +43,7 @@ type MockCard struct {
 	friendlyName    string
 	mintLimit       int
 	mintRate        int
+	nonce           uint64
 }
 
 type MockPhonon struct {
@@ -68,8 +70,14 @@ func (c *MockCard) deletePhonon(index int) {
 	c.Phonons[index].deleted = true
 }
 
-func (phonon *MockPhonon) Encode() (tlv.TLV, error) {
-	privKeyTLV, err := tlv.NewTLV(TagPhononPrivKey, phonon.PrivateKey)
+func (phonon *MockPhonon) Encode(plainTextOrEncyptedPrivateKey []byte) (tlv.TLV, error) {
+	publicKeyTLV, err := tlv.NewTLV(TagPhononPubKey, phonon.PubKey.Bytes())
+	if err != nil {
+		log.Error("could not encode mockPhonon publicKey: ", err)
+		return tlv.TLV{}, err
+	}
+
+	privKeyTLV, err := tlv.NewTLV(TagPhononPrivKey, plainTextOrEncyptedPrivateKey)
 	if err != nil {
 		log.Error("could not encode mockPhonon privKey: ", err)
 		return tlv.TLV{}, err
@@ -85,7 +93,8 @@ func (phonon *MockPhonon) Encode() (tlv.TLV, error) {
 		log.Error("mock could not encode inner phonon: ", phonon.Phonon)
 		return tlv.TLV{}, err
 	}
-	data := append(privKeyTLV.Encode(), curveTypeTLV.Encode()...)
+	data := append(publicKeyTLV.Encode(), privKeyTLV.Encode()...)
+	data = append(data, curveTypeTLV.Encode()...)
 	data = append(data, phononTLV...)
 	phononDescriptionTLV, err := tlv.NewTLV(TagPhononPrivateDescription, data)
 	if err != nil {
@@ -116,21 +125,24 @@ func decodePhononTLV(privatePhononTLV []byte) (phonon MockPhonon, err error) {
 
 	phonon.Phonon = *publicPhonon
 
+	return phonon, nil
+}
+
+func addPublicKeyToPhonon(phonon *MockPhonon) error {
 	switch phonon.CurveType {
 	case model.Secp256k1:
 		eccPrivKey, err := util.ParseECCPrivKey(phonon.PrivateKey)
 		if err != nil {
-			return phonon, err
+			return err
 		}
 		phonon.PubKey, err = model.NewPhononPubKey(ethcrypto.FromECDSAPub(&eccPrivKey.PublicKey), model.Secp256k1)
 		if err != nil {
-			return phonon, err
+			return err
 		}
 	case model.NativeCurve:
 		phonon.PubKey = DeriveNativePhononPubKey(phonon.PrivateKey)
 	}
-
-	return phonon, nil
+	return nil
 }
 
 type SecureChannelPairingDetails struct {
@@ -260,6 +272,10 @@ func (c *MockCard) IdentifyCard(nonce []byte) (cardPubKey *ecdsa.PublicKey, card
 		return c.IdentityPubKey, nil, err
 	}
 	return c.IdentityPubKey, cardSig, nil
+}
+
+func (c *MockCard) GetPostedPhononNonce() (nonce uint64, err error) {
+	return c.nonce, nil
 }
 
 func (c *MockCard) InstallCertificate(signKeyFunc func([]byte) ([]byte, error)) error {
@@ -677,8 +693,9 @@ func (c *MockCard) SendPhonons(keyIndices []uint16, extendedRequest bool) (trans
 		if c.Phonons[k].deleted {
 			return nil, errors.New("cannot access deleted phonon")
 		}
-		var phononTLV tlv.TLV
-		phononTLV, err = c.Phonons[k].Encode()
+		phonon := c.Phonons[k]
+
+		phononTLV, err := phonon.Encode(phonon.PrivateKey)
 		if err != nil {
 			return nil, errors.New("could not encode phonon TLV")
 		}
@@ -758,6 +775,85 @@ func (c *MockCard) SendPhonons(keyIndices []uint16, extendedRequest bool) (trans
 // 	return nil
 // }
 
+func (c *MockCard) PostPhonons(recipientsPublicKey *ecdsa.PublicKey, nonce uint64, keyIndices []uint16) (transferPhononPackets []byte, err error) {
+	log.Debug("sending mock POST_PHONONS command")
+	var outgoingPhonons []byte
+
+	// TODO - Not sure if this is the correct way to achieve a 32 byte key
+	recipientsPublicKeyBytes := ethcrypto.Keccak256(ethcrypto.FromECDSAPub(recipientsPublicKey))
+
+	iv := util.RandomKey(16)
+
+	for _, k := range keyIndices {
+		if int(k) >= len(c.Phonons) {
+			return nil, errors.New("keyIndex exceeds length of phonon list")
+		}
+		if c.Phonons[k].deleted {
+			return nil, errors.New("cannot access deleted phonon")
+		}
+
+		phonon := c.Phonons[k]
+
+		encryptedPrivateKey, err := crypto.EncryptData(phonon.PrivateKey, recipientsPublicKeyBytes, iv)
+		if err != nil {
+			return nil, err
+		}
+
+		phononTLV, err := phonon.Encode(encryptedPrivateKey)
+		if err != nil {
+			return nil, errors.New("could not encode phonon TLV")
+		}
+
+		outgoingPhonons = append(outgoingPhonons, phononTLV.Encode()...)
+	}
+
+	phononTransferTLV, err := tlv.NewTLV(TagTransferPhononPacket, outgoingPhonons)
+
+	if err != nil {
+		return nil, errors.New("could not encode phonon transfer TLV")
+	}
+
+	nonceBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(nonceBytes, uint64(nonce))
+
+	nonceTLV, err := tlv.NewTLV(TagNonce, nonceBytes)
+	if err != nil {
+		return nil, errors.New("could not encode nonce TLV")
+	}
+
+	ivTLV, err := tlv.NewTLV(TagAesIV, iv)
+	if err != nil {
+		return nil, errors.New("could not encode IV TLV")
+	}
+
+	cardCertTLV, err := tlv.NewTLV(TagCardCertificate, c.IdentityCert.Serialize())
+	if err != nil {
+		return nil, errors.New("could not encode cert TLV")
+	}
+
+	sig, err := ecdsa.SignASN1(rand.Reader, c.identityKey, CreatePostedPhononSignatureData(recipientsPublicKeyBytes, nonceBytes, outgoingPhonons))
+	if err != nil {
+		return nil, err
+	}
+
+	sigTLV, err := tlv.NewTLV(TagECDSASig, sig)
+	if err != nil {
+		return nil, errors.New("could not encode signedMessage TLV")
+	}
+
+	data := append(nonceTLV.Encode(), ivTLV.Encode()...)
+	data = append(data, cardCertTLV.Encode()...)
+	data = append(data, sigTLV.Encode()...)
+	data = append(data, phononTransferTLV.Encode()...)
+
+	//Delete sent phonons
+	for _, k := range keyIndices {
+		c.deletePhonon(int(k))
+	}
+
+	return data, nil
+}
+
 func (c *MockCard) ReceivePhonons(transaction []byte) (err error) {
 	log.Debug("mock RECEIVE_PHONONS command")
 	phononTransferPacketData, err := c.sc.Decrypt(transaction)
@@ -783,12 +879,137 @@ func (c *MockCard) ReceivePhonons(transaction []byte) (err error) {
 		if err != nil {
 			return err
 		}
+		addPublicKeyToPhonon(&phonon)
+		if err != nil {
+			return err
+		}
 		phonons = append(phonons, phonon)
 	}
 	//Store all received phonons
 	for _, p := range phonons {
 		c.addPhonon(&p)
 	}
+
+	return nil
+}
+
+func (c *MockCard) ReceivePostedPhonons(postedPacket []byte) (err error) {
+	log.Debug("mock RECEIVE_POSTED_PHONONS command")
+
+	collection, err := tlv.ParseTLVPacket(postedPacket)
+	if err != nil {
+		return err
+	}
+
+	iv, err := collection.FindTag(TagAesIV)
+	if err != nil {
+		log.Debug("could not parse iv tlv")
+		return err
+	}
+
+	nonceBytes, err := collection.FindTag(TagNonce)
+	if err != nil {
+		return err
+	}
+
+	sendersCardsCertBytes, err := collection.FindTag(TagCardCertificate)
+	if err != nil {
+		return errors.New("could not find certificate tlv tag")
+	}
+
+	sig, err := collection.FindTag(TagECDSASig)
+	if err != nil {
+		return err
+	}
+
+	phononTransferPacketTLV, err := tlv.ParseTLVPacket(postedPacket, TagTransferPhononPacket)
+	if err != nil {
+		return err
+	}
+
+	phononTLVs, err := phononTransferPacketTLV.FindTags(TagPhononPrivateDescription)
+	if err != nil {
+		return err
+	}
+
+	nonce := binary.BigEndian.Uint64(nonceBytes)
+
+	// check that nonce is valid
+	if nonce <= c.nonce {
+		return errors.New("transaction.nonce is less than or equal to card.postedPhononNonce")
+	}
+
+	senderCardCert, err := cert.ParseRawCardCertificate(sendersCardsCertBytes)
+	if err != nil {
+		return err
+	}
+
+	// check that sender's cert is valid
+	err = cert.ValidateCardCertificate(senderCardCert, gridplus.SafecardDevCAPubKey)
+	if err != nil {
+		return err
+	}
+
+	senderPubKey, err := util.ParseECCPubKey(senderCardCert.PubKey)
+	if err != nil {
+		return err
+	}
+
+	// check that sender's public key is valid
+	pubKeyValid := gridplus.ValidateECCPubKey(senderPubKey)
+	if !pubKeyValid {
+		return errors.New("counterparty public key is not valid ECC point")
+	}
+
+	// TODO - Not sure if this is the correct way to achieve a 32 byte key
+	publicKey := ethcrypto.Keccak256(ethcrypto.FromECDSAPub(c.IdentityPubKey))
+
+	// parse all received phonons
+	var phonons []MockPhonon
+	for _, phononTLV := range phononTLVs {
+		phonon, err := decodePhononTLV(phononTLV)
+		if err != nil {
+			return err
+		}
+
+		phonon.PrivateKey, err = crypto.DecryptData(phonon.PrivateKey, publicKey, iv)
+		if err != nil {
+			return err
+		}
+
+		addPublicKeyToPhonon(&phonon)
+		if err != nil {
+			return err
+		}
+
+		phonons = append(phonons, phonon)
+	}
+
+	// here I am converting the data into the format required for the signature verification
+	// there is probably an better way of doing this but I can't work it out.
+	var phononData []byte
+	for _, phononTLV := range phononTLVs {
+		phononTVL, err := tlv.NewTLV(TagPhononPrivateDescription, phononTLV)
+		if err != nil {
+			return err
+		}
+		phononData = append(phononData, phononTVL.Encode()...)
+	}
+
+	// validate sig
+	sigData := CreatePostedPhononSignatureData(publicKey, nonceBytes, phononData)
+	isSigValid := ecdsa.VerifyASN1(senderPubKey, sigData, sig)
+	if !isSigValid {
+		return errors.New("signature invalid")
+	}
+
+	// store all received phonons
+	for _, p := range phonons {
+		c.addPhonon(&p)
+	}
+
+	// update nonce
+	c.nonce = nonce
 
 	return nil
 }
@@ -904,4 +1125,9 @@ This is the process for deriving a native phonon hash, which is stored as its pu
 func DeriveNativePhononPubKey(salt []byte) *model.NativePubKey {
 	hash := sha512.Sum512(salt)
 	return &model.NativePubKey{Hash: hash[:]}
+}
+
+func CreatePostedPhononSignatureData(recipientsPublicKey []byte, nonce []byte, phonons []byte) []byte {
+	sig := append(recipientsPublicKey, nonce...)
+	return append(sig, phonons...)
 }

@@ -14,6 +14,7 @@ type PhononCard interface {
 	OpenSecureConnection() error
 	Init(pin string) error
 	IdentifyCard(nonce []byte) (cardPubKey *ecdsa.PublicKey, cardSig *util.ECDSASignature, err error)
+	GetPostedPhononNonce() (nonce uint64, err error)
 	VerifyPIN(pin string) error
 	ChangePIN(pin string) error
 	CreatePhonon(curveType CurveType) (keyIndex uint16, pubKey PhononPubKey, err error)
@@ -22,6 +23,8 @@ type PhononCard interface {
 	GetPhononPubKey(keyIndex uint16, crv CurveType) (pubkey PhononPubKey, err error)
 	DestroyPhonon(keyIndex uint16) (privKey *ecdsa.PrivateKey, err error)
 	SendPhonons(keyIndices []uint16, extendedRequest bool) (transferPhononPackets []byte, err error)
+	PostPhonons(recipientsPublicKey *ecdsa.PublicKey, nonce uint64, keyIndices []uint16) (transferPhononPackets []byte, err error)
+	ReceivePostedPhonons(postedPacket []byte) (err error)
 	ReceivePhonons(phononTransfer []byte) error
 	SetReceiveList(phononPubKeys []*ecdsa.PublicKey) error
 	TransactionAck(keyIndices []uint16) error

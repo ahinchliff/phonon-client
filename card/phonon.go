@@ -20,7 +20,6 @@ func TLVEncodePhononDescriptor(p *model.Phonon) ([]byte, error) {
 
 	//CurveType omitted
 
-	log.Debug("encoding phonon: ", p)
 	schemaVersionTLV, err := tlv.NewTLV(TagSchemaVersion, []byte{p.SchemaVersion})
 	if err != nil {
 		return nil, err

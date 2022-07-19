@@ -1,31 +1,31 @@
-swagger: "2.0"
+swagger: '2.0'
 info:
-  description: "UI frontend api (if that makes any sense)"
-  version: "0.0.0"
-  title: "Phonon-api"
-host: "localhost:{{.}}"
-basePath: "/"
+  description: 'UI frontend api (if that makes any sense)'
+  version: '0.0.0'
+  title: 'Phonon-api'
+host: 'localhost:{{.}}'
+basePath: '/'
 tags:
-- name: "sessions"
-  description: "connected card sessions"
-- name: "phonons"
-  description: "phonons on selected card"
+  - name: 'sessions'
+    description: 'connected card sessions'
+  - name: 'phonons'
+    description: 'phonons on selected card'
 schemes:
-- "http"
+  - 'http'
 paths:
   /genMock:
     get:
       tags:
-      - "sessions"
+        - 'sessions'
       responses:
-        "200":
-          description: "mock generated"
+        '200':
+          description: 'mock generated'
   /listSessions:
     get:
       tags:
-      - "sessions"
+        - 'sessions'
       produces:
-      - "application/json"
+        - 'application/json'
       responses:
         "404":
           description: "No connected cards"
@@ -64,66 +64,66 @@ paths:
   /cards/{sessionID}/unlock:
     post:
       tags:
-      - "sessions"
+        - 'sessions'
       responses:
-        "404":
-          description: "no session with id"
-        "200":
-          description: "card unlocked"
+        '404':
+          description: 'no session with id'
+        '200':
+          description: 'card unlocked'
       parameters:
-      - in: path
-        required: true
-        name: sessionID
-        type: string
-        description: sessionID of connected card
-      - in: "body"
-        name: "body"
-        description: "Pin to unlock the card"
-        required: true
-        schema:
-          type: object
-          properties:
-            pin:
-              type: "string"
+        - in: path
+          required: true
+          name: sessionID
+          type: string
+          description: sessionID of connected card
+        - in: 'body'
+          name: 'body'
+          description: 'Pin to unlock the card'
+          required: true
+          schema:
+            type: object
+            properties:
+              pin:
+                type: 'string'
   /cards/{sessionID}/connect:
     post:
       tags:
-      - "sessions"
+        - 'sessions'
       responses:
-        "404":
-          description: "no session with id"
-        "200":
-          description: "Connected to Jumpbox"
+        '404':
+          description: 'no session with id'
+        '200':
+          description: 'Connected to Jumpbox'
     parameters:
       - in: path
         required: true
         name: sessionID
         type: string
         description: sessionID of connected card
-      - in: "body"
-        name: "body"
-        description: "URL of the jumbbox host https://phonon-bridge.tld"
+      - in: 'body'
+        name: 'body'
+        description: 'URL of the jumbbox host https://phonon-bridge.tld'
         required: true
         schema:
           type: object
           properties:
             url:
-              type: "string"
+              type: 'string'
   /cards/{sessionID}/connectionStatus:
     get:
       tags:
-      - "sessions"
+        - 'sessions'
       responses:
-        "500":
-          description: "internal error retrieving connection status"
-        "200":
-          description: "connection status returned"
+        '500':
+          description: 'internal error retrieving connection status'
+        '200':
+          description: 'connection status returned'
           schema:
-            type: "object"
+            type: 'object'
             properties:
               ConnectionStatus:
-                type: "integer"
-                description: "0: unconnected, 1: connectedToBridge, 2: connectedToCard, 3: CardPair1Complete, 4: CardPair2Complete, 5: CardPairingComplete"
+                type: 'integer'
+                description: '0: unconnected, 1: connectedToBridge, 2: connectedToCard, 3: CardPair1Complete, 4: CardPair2Complete, 5: CardPairingComplete'
     parameters:
       - in: path
         required: true
@@ -134,12 +134,12 @@ paths:
   /cards/{sessionID}/connectLocal:
     post:
       tags:
-      - "sessions"
+        - 'sessions'
       responses:
-        "404":
-          description: "no session with id"
-        "200":
-          description: "Ready to pair locally"
+        '404':
+          description: 'no session with id'
+        '200':
+          description: 'Ready to pair locally'
     parameters:
       - in: path
         required: true
@@ -149,319 +149,422 @@ paths:
   /cards/{sessionID}/pair:
     post:
       tags:
-      - "sessions"
+        - 'sessions'
       responses:
-        "404":
-          description: "no session with id"
-        "200":
-          description: "card Paired"
+        '404':
+          description: 'no session with id'
+        '200':
+          description: 'card Paired'
     parameters:
       - in: path
         required: true
         name: sessionID
         type: string
         description: sessionID of connected card
-      - in: "body"
-        name: "body"
-        description: "ID of the card attached to the jumpobox you wish to pair with"
+      - in: 'body'
+        name: 'body'
+        description: 'ID of the card attached to the jumpobox you wish to pair with'
         required: true
         schema:
           type: object
           properties:
             cardID:
-              type: "string"
+              type: 'string'
   /cards/{sessionID}/listPhonons:
     get:
       tags:
-      - "sessions"
+        - 'sessions'
       responses:
-        "404":
-          description: "no session with id"
-        "200":
-          description: "phonons listed"
+        '404':
+          description: 'no session with id'
+        '200':
+          description: 'phonons listed'
           schema:
-            type: "array"
+            type: 'array'
             items:
-              type: "object"
+              type: 'object'
               properties:
                 KeyIndex:
-                  type: "integer"
+                  type: 'integer'
                 PubKey:
-                  type: "string"
+                  type: 'string'
                 Value:
-                  type: "integer"
+                  type: 'integer'
                 CurrencyType:
-                  type: "integer"
+                  type: 'integer'
     parameters:
-    - in: path
-      required: true
-      name: sessionID
-      type: string
-      description: sessionID of connected card
+      - in: path
+        required: true
+        name: sessionID
+        type: string
+        description: sessionID of connected card
+
+  /cards/{sessionID}/nonce:
+    get:
+      tags:
+        - 'sessions'
+      responses:
+        '404':
+          description: 'no session with id'
+        '200':
+          description: 'nonce'
+          schema:
+            type: 'object'
+            properties:
+              Nonce:
+                type: 'integer'
+    parameters:
+      - in: path
+        required: true
+        name: sessionID
+        type: string
+        description: sessionID of connected card
+
+  /cards/{sessionID}/identity/{nonce}:
+    get:
+      tags:
+        - 'sessions'
+      responses:
+        '404':
+          description: 'no session with id'
+        '200':
+          description: 'public key'
+          schema:
+            type: 'object'
+            properties:
+              PublicKey:
+                type: 'string'
+              Signature:
+                type: 'string'
+    parameters:
+      - in: path
+        required: true
+        name: sessionID
+        type: string
+        description: sessionID of connected card
+      - in: path
+        required: true
+        name: nonce
+        type: string
+        description: data for card to sign
+
+  /cards/{sessionID}/consumePosted:
+    post:
+      tags:
+        - 'sessions'
+      responses:
+        '404':
+          description: 'no session with id'
+        '200':
+          description: 'Success'
+    parameters:
+      - in: path
+        required: true
+        name: sessionID
+        type: string
+        description: sessionID of connected card
+      - in: 'body'
+        name: 'body'
+        required: true
+        schema:
+          type: object
+          properties:
+            Packet:
+              type: 'string'
 
   /cards/{sessionID}/phonon/{phononIndex}/setDescriptor:
     post:
       tags:
-      - "phonons"
+        - 'phonons'
       responses:
-        "404":
+        '404':
           description: "Either the session or phonon doesn't exist"
-        "200":
-          description: "Descriptor set properly"
+        '200':
+          description: 'Descriptor set properly'
     parameters:
-    - in: path
-      required: true
-      name: sessionID
-      type: string
-      description: sessionID of connected card
-    - in: path
-      required: true
-      name: phononIndex
-      type: string
-      description: index of phonon to set descriptor on
-    - in: "body"
-      name: "body"
-      description: "descriptor of phonon to be set"
-      required: true
-      schema:
-        type: object
-        properties:
-          currencyType:
-            type: "integer"
-          value:
-            type: "integer"
+      - in: path
+        required: true
+        name: sessionID
+        type: string
+        description: sessionID of connected card
+      - in: path
+        required: true
+        name: phononIndex
+        type: string
+        description: index of phonon to set descriptor on
+      - in: 'body'
+        name: 'body'
+        description: 'descriptor of phonon to be set'
+        required: true
+        schema:
+          type: object
+          properties:
+            currencyType:
+              type: 'integer'
+            value:
+              type: 'integer'
   /cards/{sessionID}/phonon/{phononIndex}/send:
     post:
       tags:
-      - "phonons"
+        - 'phonons'
       responses:
-        "404":
+        '404':
           description: "Either the session or phonon doesn't exist"
-        "200":
-          description: "Phonon sent"
+        '200':
+          description: 'Phonon sent'
     parameters:
-    - in: path
-      required: true
-      name: sessionID
-      type: string
-      description: sessionID of connected card
-    - in: path
-      required: true
-      name: phononIndex
-      type: string
-      description: index of phonon to send
+      - in: path
+        required: true
+        name: sessionID
+        type: string
+        description: sessionID of connected card
+      - in: path
+        required: true
+        name: phononIndex
+        type: string
+        description: index of phonon to send
+  /cards/{sessionID}/phonon/{phononIndex}/post:
+    post:
+      tags:
+        - 'phonons'
+      responses:
+        '404':
+          description: "Either the session or phonon doesn't exist"
+        '200':
+          description: 'Phonon sent'
+    parameters:
+      - in: path
+        required: true
+        name: sessionID
+        type: string
+        description: sessionID of connected card
+      - in: path
+        required: true
+        name: phononIndex
+        type: string
+        description: index of phonon to send
+      - in: 'body'
+        name: 'body'
+        required: true
+        schema:
+          type: object
+          properties:
+            RecipientsPublicKey:
+              type: 'string'
+            Nonce:
+              type: 'number'
   /cards/{sessionID}/phonon/create:
     post:
       tags:
-      - "phonons"
+        - 'phonons'
       responses:
-        "500":
+        '500':
           description: "it didn't work"
-        "200":
-          description: "created phonon"
+        '200':
+          description: 'created phonon'
           schema:
-            type: "object"
+            type: 'object'
             properties:
               index:
-                type: "integer"
+                type: 'integer'
               pubkey:
-                type: "string"
+                type: 'string'
     parameters:
-    - in: path
-      required: true
-      name: sessionID
-      type: string
-      description: sessionID of connected card
+      - in: path
+        required: true
+        name: sessionID
+        type: string
+        description: sessionID of connected card
 
   /cards/{sessionID}/phonon/redeem:
     post:
       tags:
-      - "phonons"
+        - 'phonons'
       responses:
-        "400":
-          description: "unable to decode request"
-        "500":
-          description: "unable to encode response"
-        "200":
-          description: "phonon successfully redeemed"
+        '400':
+          description: 'unable to decode request'
+        '500':
+          description: 'unable to encode response'
+        '200':
+          description: 'phonon successfully redeemed'
           schema:
-            type: "array"
+            type: 'array'
             items:
-              $ref: "#/definitions/RedeemPhononResponse"
+              $ref: '#/definitions/RedeemPhononResponse'
     parameters:
-    - in: path
-      required: true
-      name: sessionID
-      type: string
-      description: sessionID of connected card
-    - in: "body"
-      name: "body"
-      description: "array of phonons to redeem along with redeem addresses to send them to"
-      required: true
-      schema:
-        type: "array"
-        items:
-          $ref: "#/definitions/RedeemPhononRequest"
-  /cards/{sessionID}/phonon/{phononIndex}/export:
-    post:
-      tags:
-      - "phonons"
-      responses:
-        "404":
-          description: "Either the session or phonon doesn't exist"
-        "200":
-          description: "Descriptor set properly"
-          schema:
-            type: "object"
-            properties:
-              privateKey:
-                type: "string"
-    parameters:
-    - in: path
-      required: true
-      name: sessionID
-      type: string
-      description: sessionID of connected card
-    - in: path
-      required: true
-      name: phononIndex
-      type: string
-      description: index of phonon to redeem
-  /cards/{sessionID}/phonon/initDeposit:
-    post:
-      tags:
-      - "phonons"
-      summary: "initiate a new phonon deposit by creating raw phonons and retrieving their keyIndices, denominations, and addresses"
-      consumes:
-      - "application/json"
-      produces:
-      - "application/json"
-      responses:
-        "404":
-          description: "status not found"
-        "400":
-          description: "could not parse request"
-        "500":
-          description: "could not create necessary phonons"
-        "200":
-          description: "phonons created"
-          schema:
-            type: "array"
-            items:
-              $ref: "#/definitions/Phonon"
-    parameters:
-    - in: "path"
-      required: true
-      name: sessionID
-      type: string
-      description: "sessionID of connected card"
-    - in: "body"
-      name: "body"
-      description: "phonon currencyType and list of denominations to be created"
-      required: true
-      schema:
-        $ref: "#/definitions/DepositRequest"
-  /cards/{sessionID}/phonon/finalizeDeposit:
-    post:
-      tags:
-      - "phonons"
-      summary: "finalize a phonon deposit by confirming success or failure of on chain deposit transaction"
-      consumes:
-      - "application/json"
-      produces:
-      - "application/json"
-      responses:
-        "404":
-          description: "status not found"
-        "400":
-          description: "could not parse request"
-        "500":
-          description: "failed to finalize deposit"
-        "200":
-          description: "deposit finalized"
-          schema:
-            type: "array"
-            items:
-              $ref: "#/definitions/DepositConfirmation"
-      parameters:
-      - in: "path"
+      - in: path
         required: true
         name: sessionID
         type: string
-        description: "sessionID of connected card"
-      - in: "body"
-        name: "body"
-        description: "phonons to be finalized along with status of on chain deposit transaction"
+        description: sessionID of connected card
+      - in: 'body'
+        name: 'body'
+        description: 'array of phonons to redeem along with redeem addresses to send them to'
         required: true
         schema:
-          type: "array"
+          type: 'array'
           items:
-            $ref: "#/definitions/DepositConfirmation"
+            $ref: '#/definitions/RedeemPhononRequest'
+  /cards/{sessionID}/phonon/{phononIndex}/export:
+    post:
+      tags:
+        - 'phonons'
+      responses:
+        '404':
+          description: "Either the session or phonon doesn't exist"
+        '200':
+          description: 'Descriptor set properly'
+          schema:
+            type: 'object'
+            properties:
+              privateKey:
+                type: 'string'
+    parameters:
+      - in: path
+        required: true
+        name: sessionID
+        type: string
+        description: sessionID of connected card
+      - in: path
+        required: true
+        name: phononIndex
+        type: string
+        description: index of phonon to redeem
+  /cards/{sessionID}/phonon/initDeposit:
+    post:
+      tags:
+        - 'phonons'
+      summary: 'initiate a new phonon deposit by creating raw phonons and retrieving their keyIndices, denominations, and addresses'
+      consumes:
+        - 'application/json'
+      produces:
+        - 'application/json'
+      responses:
+        '404':
+          description: 'status not found'
+        '400':
+          description: 'could not parse request'
+        '500':
+          description: 'could not create necessary phonons'
+        '200':
+          description: 'phonons created'
+          schema:
+            type: 'array'
+            items:
+              $ref: '#/definitions/Phonon'
+    parameters:
+      - in: 'path'
+        required: true
+        name: sessionID
+        type: string
+        description: 'sessionID of connected card'
+      - in: 'body'
+        name: 'body'
+        description: 'phonon currencyType and list of denominations to be created'
+        required: true
+        schema:
+          $ref: '#/definitions/DepositRequest'
+  /cards/{sessionID}/phonon/finalizeDeposit:
+    post:
+      tags:
+        - 'phonons'
+      summary: 'finalize a phonon deposit by confirming success or failure of on chain deposit transaction'
+      consumes:
+        - 'application/json'
+      produces:
+        - 'application/json'
+      responses:
+        '404':
+          description: 'status not found'
+        '400':
+          description: 'could not parse request'
+        '500':
+          description: 'failed to finalize deposit'
+        '200':
+          description: 'deposit finalized'
+          schema:
+            type: 'array'
+            items:
+              $ref: '#/definitions/DepositConfirmation'
+      parameters:
+        - in: 'path'
+          required: true
+          name: sessionID
+          type: string
+          description: 'sessionID of connected card'
+        - in: 'body'
+          name: 'body'
+          description: 'phonons to be finalized along with status of on chain deposit transaction'
+          required: true
+          schema:
+            type: 'array'
+            items:
+              $ref: '#/definitions/DepositConfirmation'
   /logs:
     post:
       tags:
-      - "logs"
-      summary: "place to send logs"
+        - 'logs'
+      summary: 'place to send logs'
       consumes:
-      - "application/json"
+        - 'application/json'
       responses:
-        "200":
-          description: "log logged"
-        "400":
-          description: "log formatted wrong"
-        "500":
-          description: "unable to log log"
+        '200':
+          description: 'log logged'
+        '400':
+          description: 'log formatted wrong'
+        '500':
+          description: 'unable to log log'
       parameters:
-      - in: "body"
-        name: "body"
-        required: true
-        schema:
-          type: object
+        - in: 'body'
+          name: 'body'
+          required: true
+          schema:
+            type: object
 definitions:
   Phonon:
     type: object
     properties:
       KeyIndex:
-        type: "integer"
+        type: 'integer'
       PubKey:
-        type: "string"
+        type: 'string'
       Address:
-        type: "string"
+        type: 'string'
       AddressType:
-        type: "integer"
+        type: 'integer'
       SchemaVersion:
-        type: "integer"
+        type: 'integer'
       ExtendedSchemaVersion:
-        type: "integer"
+        type: 'integer'
       Denomination:
-        type: "integer"
+        type: 'integer'
       CurrencyType:
-        type: "integer"
+        type: 'integer'
   DepositRequest:
     type: object
     properties:
       CurrencyType:
-        type: "integer"
+        type: 'integer'
       Denominations:
-        type: "array"
+        type: 'array'
         items:
-          type: "integer"
+          type: 'integer'
   DepositConfirmation:
     type: object
     properties:
       Phonon:
-        $ref: "#/definitions/Phonon"
+        $ref: '#/definitions/Phonon'
       ConfirmedOnChain:
-        type: "boolean"
+        type: 'boolean'
       ConfirmedOnCard:
-        type: "boolean"
+        type: 'boolean'
   RedeemPhononRequest:
     type: object
     properties:
       Phonon:
-        $ref: "#/definitions/Phonon"
+        $ref: '#/definitions/Phonon'
       RedeemAddress:
-        type: "string"
+        type: 'string'
   RedeemPhononResponse:
     type: object
     properties:
