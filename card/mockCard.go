@@ -969,7 +969,7 @@ func (c *MockCard) ReceivePostedPhonons(postedPacket []byte) (err error) {
 	}
 
 	// TODO - Not sure if this is the correct way to achieve a 32 byte key
-	publicKey := ethcrypto.Keccak256(ethcrypto.FromECDSAPub(c.IdentityPubKey))
+	privateKey := ethcrypto.Keccak256(ethcrypto.FromECDSA(c.identityKey))
 
 	// parse all received phonons
 	var phonons []MockPhonon
@@ -979,7 +979,7 @@ func (c *MockCard) ReceivePostedPhonons(postedPacket []byte) (err error) {
 			return err
 		}
 
-		phonon.PrivateKey, err = crypto.DecryptData(phonon.PrivateKey, publicKey, iv)
+		phonon.PrivateKey, err = crypto.DecryptData(phonon.PrivateKey, privateKey, iv)
 		if err != nil {
 			return err
 		}
@@ -1002,6 +1002,9 @@ func (c *MockCard) ReceivePostedPhonons(postedPacket []byte) (err error) {
 		}
 		phononData = append(phononData, phononTVL.Encode()...)
 	}
+
+	// TODO - Not sure if this is the correct way to achieve a 32 byte key
+	publicKey := ethcrypto.Keccak256(ethcrypto.FromECDSAPub(c.IdentityPubKey))
 
 	// validate sig
 	sigData := CreatePostedPhononSignatureData(publicKey, nonceBytes, phononData)
