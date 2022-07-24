@@ -777,13 +777,15 @@ func (c *MockCard) SendPhonons(keyIndices []uint16, extendedRequest bool) (trans
 
 func (c *MockCard) PostPhonons(recipientsPublicKey *ecdsa.PublicKey, nonce uint64, keyIndices []uint16) (transferPhononPackets []byte, err error) {
 	log.Debug("sending mock POST_PHONONS command")
-	var outgoingPhonons []byte
-
 	// TODO - Not sure if this is the correct way to achieve a 32 byte key
 	recipientsPublicKeyBytes := ethcrypto.Keccak256(ethcrypto.FromECDSAPub(recipientsPublicKey))
 
+	nonceBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(nonceBytes, uint64(nonce))
+
 	iv := util.RandomKey(16)
 
+	var outgoingPhonons []byte
 	for _, k := range keyIndices {
 		if int(k) >= len(c.Phonons) {
 			return nil, errors.New("keyIndex exceeds length of phonon list")
@@ -807,14 +809,18 @@ func (c *MockCard) PostPhonons(recipientsPublicKey *ecdsa.PublicKey, nonce uint6
 		outgoingPhonons = append(outgoingPhonons, phononTLV.Encode()...)
 	}
 
-	phononTransferTLV, err := tlv.NewTLV(TagTransferPhononPacket, outgoingPhonons)
+	fmt.Printf("mystr:\t %v \n", c.IdentityPubKey)
+	fmt.Printf("mystr:\t %v \n", c.IdentityCert)
 
+	sig, err := ecdsa.SignASN1(rand.Reader, c.identityKey, CreatePostedPhononSignatureData(recipientsPublicKeyBytes, nonceBytes, outgoingPhonons))
+	if err != nil {
+		return nil, err
+	}
+
+	phononTransferTLV, err := tlv.NewTLV(TagTransferPhononPacket, outgoingPhonons)
 	if err != nil {
 		return nil, errors.New("could not encode phonon transfer TLV")
 	}
-
-	nonceBytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(nonceBytes, uint64(nonce))
 
 	nonceTLV, err := tlv.NewTLV(TagNonce, nonceBytes)
 	if err != nil {
@@ -831,17 +837,18 @@ func (c *MockCard) PostPhonons(recipientsPublicKey *ecdsa.PublicKey, nonce uint6
 		return nil, errors.New("could not encode cert TLV")
 	}
 
-	sig, err := ecdsa.SignASN1(rand.Reader, c.identityKey, CreatePostedPhononSignatureData(recipientsPublicKeyBytes, nonceBytes, outgoingPhonons))
-	if err != nil {
-		return nil, err
-	}
-
 	sigTLV, err := tlv.NewTLV(TagECDSASig, sig)
 	if err != nil {
 		return nil, errors.New("could not encode signedMessage TLV")
 	}
 
+	recipientsPublicKeyTLV, err := tlv.NewTLV(TagIdentityPublicKey, recipientsPublicKeyBytes)
+	if err != nil {
+		return nil, errors.New("could not encode receiptsPublicKey TLV")
+	}
+
 	data := append(nonceTLV.Encode(), ivTLV.Encode()...)
+	data = append(data, recipientsPublicKeyTLV.Encode()...)
 	data = append(data, cardCertTLV.Encode()...)
 	data = append(data, sigTLV.Encode()...)
 	data = append(data, phononTransferTLV.Encode()...)
