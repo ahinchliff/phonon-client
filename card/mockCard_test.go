@@ -1,8 +1,10 @@
 package card
 
 import (
-	"github.com/GridPlus/phonon-client/cert"
 	"testing"
+
+	"github.com/GridPlus/phonon-client/cert"
+	"github.com/GridPlus/phonon-client/model"
 )
 
 func TestCardPair(t *testing.T) {
@@ -34,6 +36,55 @@ func TestCardPair(t *testing.T) {
 	if err != nil {
 		t.Error("error in card pair")
 		t.Error(err)
+	}
+}
+
+func TestPostedPhononFlow(t *testing.T) {
+	senderCard, err := NewMockCard(true, false)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	recipientCard, err := NewMockCard(true, false)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	senderCard.VerifyPIN("111111")
+	recipientCard.VerifyPIN("111111")
+
+	_, createdPhononPubKey, err := senderCard.CreatePhonon(model.Secp256k1)
+
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	transaction, err := senderCard.PostPhonons(recipientCard.IdentityPubKey, 1, []model.PhononKeyIndex{0})
+
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	err = recipientCard.ReceivePostedPhonons(transaction)
+
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	receivedPhononPubKey, err := recipientCard.GetPhononPubKey(0, model.Secp256k1)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	if !createdPhononPubKey.Equal(receivedPhononPubKey) {
+		t.Error("Created and received phonon pub keys do not match", createdPhononPubKey, receivedPhononPubKey)
+		return
 	}
 
 }
