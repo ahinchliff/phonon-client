@@ -417,6 +417,12 @@ func (cs *PhononCommandSet) IdentifyCard(nonce []byte) (cardPubKey *ecdsa.Public
 	return cardPubKey, cardSig, nil
 }
 
+func (cs *PhononCommandSet) GetPostedPhononNonce() (nonce uint64, err error) {
+	log.Debug("sending IDENTIFY_POSTED_PHONON_NONCE command")
+	log.Debug("POST PHONONS ONLY AVAIALABLE FOR MOCK CARDS RIGHT NOW")
+	return 0, nil
+}
+
 func (cs *PhononCommandSet) VerifyPIN(pin string) error {
 	log.Debug("sending VERIFY_PIN command")
 	cmd := NewCommandVerifyPIN(pin)
@@ -674,6 +680,18 @@ func (cs *PhononCommandSet) SendPhonons(keyIndices []model.PhononKeyIndex, exten
 	// 	transferPhononPackets = append(transferPhononPackets, extendedPhononPackets...)
 	// }
 	return transferPhononPackets, nil
+}
+
+func (cs *PhononCommandSet) PostPhonons(recipientsPublicKey *ecdsa.PublicKey, nonce uint64, keyIndices []model.PhononKeyIndex) (transferPhononPackets []byte, err error) {
+	log.Debug("sending POST_PHONONS command")
+	log.Debug("POST PHONONS ONLY AVAIALABLE FOR MOCK CARDS RIGHT NOW")
+	return nil, nil
+}
+
+func (cs *PhononCommandSet) ReceivePostedPhonons(postedPacket []byte) (err error) {
+	log.Debug("sending RECEIVE_POSTED_PHONONS command")
+	log.Debug("RECEIVE POSTED PHONONS ONLY AVAIALABLE FOR MOCK CARDS RIGHT NOW")
+	return nil
 }
 
 func (cs *PhononCommandSet) ReceivePhonons(phononTransfer []byte) error {

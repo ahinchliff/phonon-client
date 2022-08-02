@@ -30,7 +30,7 @@ paths:
         "404":
           description: "No connected cards"
         "200":
-          description: "list of attached card's session info"
+          description: "list of attached cards session info"
           schema:
             type: "array"
             items:
@@ -228,7 +228,7 @@ paths:
       - "phonons"
       responses:
         "404":
-          description: "Either the session or phonon doesn't exist"
+          description: "Either the session or phonon doesnt exist"
         "200":
           description: "Descriptor set properly"
     parameters:
@@ -259,7 +259,7 @@ paths:
       - "phonons"
       responses:
         "404":
-          description: "Either the session or phonon doesn't exist"
+          description: "Either the session or phonon doesnt exist"
         "200":
           description: "Phonon sent"
     parameters:
@@ -282,7 +282,7 @@ paths:
       - "phonons"
       responses:
         "500":
-          description: "it didn't work"
+          description: "it didnt work"
         "200":
           description: "created phonon"
           schema:
@@ -334,7 +334,7 @@ paths:
       - "phonons"
       responses:
         "404":
-          description: "Either the session or phonon doesn't exist"
+          description: "Either the session or phonon doesnt exist"
         "200":
           description: "Descriptor set properly"
           schema:
@@ -461,6 +461,105 @@ paths:
         required: true
         schema:
           type: string
+  /cards/{sessionID}/postedPhononNonce:
+    get:
+      tags:
+        - sessions
+      responses:
+        404:
+          description: no session with id
+        200:
+          description: nonce
+          schema:
+            type: object
+            properties:
+              Nonce:
+                type: integer
+    parameters:
+      - in: path
+        required: true
+        name: sessionID
+        type: string
+        description: sessionID of connected card
+  /cards/{sessionID}/identity/{nonce}:
+    get:
+      tags:
+        - sessions
+      responses:
+        404:
+          description: no session with id
+        200:
+          description: public key
+          schema:
+            type: object
+            properties:
+              PublicKey:
+                type: string
+              Signature:
+                type: string
+    parameters:
+      - in: path
+        required: true
+        name: sessionID
+        type: string
+        description: sessionID of connected card
+      - in: path
+        required: true
+        name: nonce
+        type: string
+        description: data for card to sign
+  /cards/{sessionID}/phonon/post:
+    post:
+      tags:
+        - phonons
+      responses:
+        404:
+          description: "Either the session or phonon doesnt exist"
+        200:
+          description: Phonon sent
+    parameters:
+      - in: path
+        required: true
+        name: sessionID
+        type: string
+        description: sessionID of connected card
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          properties:
+            RecipientsPublicKey:
+              type: string
+            Nonce:
+              type: integer
+            KeyIndexes:
+              type: "array"
+              items:
+                type: integer
+  /cards/{sessionID}/receivePostedPhonons:
+    post:
+      tags:
+        - sessions
+      responses:
+        404:
+          description: no session with id
+        200:
+          description: Success
+    parameters:
+      - in: path
+        required: true
+        name: sessionID
+        type: string
+        description: sessionID of connected card
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          properties:
+            Packet:
+              type: string
 definitions:
   Phonon:
     type: object
